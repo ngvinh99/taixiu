@@ -36,7 +36,7 @@ function connectWebSocket() {
     const authPayload = [
       1, "MiniGame", "SC_xigtupou", "conga999", {
         info: "{\"ipAddress\":\"171.246.10.199\",\"userId\":\"7c54ec3f-ee1a-428c-a56e-1bc14fd27e57\",\"username\":\"SC_xigtupou\",\"timestamp\":1748266471861,\"refreshToken\":\"ce8de19af18f4417bb68c3632408d4d7.479079475124482181468c8923b636af\"}",
-        signature: "0EC9..." // cắt ngắn
+        signature: "0EC9..."
       }
     ];
     ws.send(JSON.stringify(authPayload));
@@ -99,7 +99,7 @@ fastify.get("/api/taixiu", async () => {
   const pattern13 = validResults
     .slice(0, 13)
     .map(r => (r.d1 + r.d2 + r.d3) >= 11 ? "T" : "X")
-    .reverse() // đảo lại từ cũ → mới
+    .reverse()
     .join("");
 
   const prediction = duDoanTuPattern(pattern13);
