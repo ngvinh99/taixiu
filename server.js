@@ -157,7 +157,7 @@ fastify.get("/api/concac", async (request, reply) => {
   return {
     current_result: currentResult,
     current_session: currentSession,
-    phien_hien_tai: currentSession,
+    phien_hien_tai: currentSession + 1,
     du_doan: du_doan,
     used_pattern: pattern,
     do_tin_cay: do_tin_cay + "%",
