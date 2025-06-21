@@ -1,19 +1,10 @@
-
 const Fastify = require("fastify");
-const WebSocket = require("ws");
-
 const fastify = Fastify({ logger: false });
 const PORT = process.env.PORT || 3000;
 
 let lastResults = [];
-let currentResult = null;
-let currentSession = null;
 
-let ws = null;
-let reconnectInterval = 5000;
-let intervalCmd = null;
-
-// === THUẬT TOÁN DỰ ĐOÁN MỚI ===
+// GIỮ NGUYÊN THUẬT TOÁN
 function multiWindowV3(patternArr, windows = [5, 10, 20, 30, 50]) {
   const voteCounts = { Tài: 0, Xỉu: 0 };
   let totalWeight = 0;
@@ -52,63 +43,43 @@ function multiWindowV3(patternArr, windows = [5, 10, 20, 30, 50]) {
   return { prediction: finalPredict, confidence };
 }
 
-// Dummy functions thay thế tạm thời (cần viết lại bằng thuật toán thật)
+// Dummy functions (bạn cần thay bằng thuật toán thật)
 function markovWeightedV3(pattern) {
   return Math.random() > 0.5 ? "Tài" : "Xỉu";
 }
-
 function repeatingPatternV3(pattern) {
   return Math.random() > 0.5 ? "Tài" : "Xỉu";
 }
-
 function detectBiasV3(pattern) {
   return Math.random() > 0.5 ? "Tài" : "Xỉu";
 }
 
-// WebSocket client
-function connectWS() {
-  ws = new WebSocket("wss://example.com/your-socket"); // Thay URL nếu cần
+// Thêm kết quả thủ công để test
+fastify.post("/add", async (request, reply) => {
+  const { result } = request.body;
+  if (!["T", "X"].includes(result)) {
+    return reply.code(400).send({ error: "Giá trị phải là 'T' hoặc 'X'" });
+  }
+  lastResults.push(result);
+  if (lastResults.length > 100) lastResults.shift();
+  return reply.send({ added: result, total: lastResults.length });
+});
 
-  ws.on("open", () => {
-    console.log("WebSocket connected.");
-  });
-
-  ws.on("message", (data) => {
-    const result = data.toString();
-    if (result === "T" || result === "X") {
-      lastResults.push(result);
-      if (lastResults.length > 100) lastResults.shift();
-      currentResult = result;
-    }
-  });
-
-  ws.on("close", () => {
-    console.log("WebSocket disconnected. Reconnecting in 5s...");
-    setTimeout(connectWS, reconnectInterval);
-  });
-
-  ws.on("error", (err) => {
-    console.error("WebSocket error:", err.message);
-  });
-}
-
-// Khởi động WebSocket
-connectWS();
-
-// API endpoint để lấy kết quả dự đoán
+// Lấy dự đoán
 fastify.get("/predict", async (request, reply) => {
   if (lastResults.length < 10) {
-    return reply.send({ error: "Not enough data" });
+    return reply.send({ error: "Không đủ dữ liệu để dự đoán (tối thiểu 10 kết quả)" });
   }
   const res = multiWindowV3(lastResults);
   return reply.send(res);
 });
 
+// Kiểm tra server
 fastify.get("/", async (request, reply) => {
   reply.send({ status: "Server is running." });
 });
 
-// Lắng nghe cổng
+// Khởi chạy server
 fastify.listen({ port: PORT }, (err, address) => {
   if (err) {
     console.error(err);
