@@ -5,16 +5,21 @@ const fs = require("fs");
 const fastify = Fastify({ logger: false });
 const PORT = 3000;
 
-function duDoanTuPattern(pattern13) {
+function duDoanTuPattern(pattern) {
   try {
-    const data = fs.readFileSync("du_doan.txt", "utf8");
-    const line = data.split("\n").find(line => line.startsWith(pattern13));
-    if (!line) return null;
-    if (line.includes("Dự đoán: T")) return "Tài";
-    if (line.includes("Dự đoán: X")) return "Xỉu";
-    return null;
+    const data = fs.readFileSync("du_doan.txt", "utf8").split("\n");
+    // Tìm dòng khớp dài nhất
+    for (let len = pattern.length; len >= 1; len--) {
+      const sub = pattern.slice(-len);
+      const matched = data.find(line => line.startsWith(sub));
+      if (matched) {
+        if (matched.includes("Dự đoán: T")) return { predict: "Tài", pattern: sub };
+        if (matched.includes("Dự đoán: X")) return { predict: "Xỉu", pattern: sub };
+      }
+    }
+    return { predict: null, pattern: pattern };
   } catch {
-    return null;
+    return { predict: null, pattern: pattern };
   }
 }
 
@@ -79,14 +84,14 @@ fastify.get("/", async () => {
 fastify.get("/api/taixiu", async () => {
   const validResults = [...lastResults].filter(item => item.d1 && item.d2 && item.d3);
 
-  if (validResults.length < 13) {
+  if (validResults.length < 1) {
     return {
       current_result: null,
       current_session: null,
       next_session: null,
       prediction: null,
       used_pattern: "",
-      reason: "❗ Chưa đủ 13 phiên gần nhất"
+      reason: "❗ Chưa có dữ liệu phiên gần nhất"
     };
   }
 
@@ -96,21 +101,21 @@ fastify.get("/api/taixiu", async () => {
   const currentSession = current.sid;
   const nextSession = currentSession + 1;
 
-  const pattern13 = validResults
-    .slice(0, 13)
+  const pattern = validResults
+    .slice(0, Math.min(validResults.length, 13))
     .map(r => (r.d1 + r.d2 + r.d3) >= 11 ? "T" : "X")
     .reverse()
     .join("");
 
-  const prediction = duDoanTuPattern(pattern13);
+  const { predict, pattern: matchedPattern } = duDoanTuPattern(pattern);
 
   return {
     current_result: result,
     current_session: currentSession,
     next_session: nextSession,
-    prediction,
-    used_pattern: pattern13,
-    reason: prediction ? "✅ Khớp file công thức" : "❌ Không khớp pattern nào"
+    prediction: predict,
+    used_pattern: matchedPattern,
+    reason: predict ? "✅ Khớp file công thức" : "❌ Không khớp pattern nào"
   };
 });
 
