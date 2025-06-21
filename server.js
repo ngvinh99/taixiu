@@ -3,9 +3,8 @@ const WebSocket = require("ws");
 const fs = require("fs");
 
 const fastify = Fastify({ logger: false });
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
-// Đọc file du_doan.txt
 const duDoanData = fs.readFileSync("du_doan.txt", "utf8");
 
 function duDoanTuPattern(pattern13) {
@@ -35,7 +34,7 @@ function connectWebSocket() {
     const authPayload = [
       1, "MiniGame", "SC_xigtupou", "conga999", {
         info: "{\"ipAddress\":\"171.246.10.199\",\"userId\":\"7c54ec3f-ee1a-428c-a56e-1bc14fd27e57\",\"username\":\"SC_xigtupou\",\"timestamp\":1748266471861,\"refreshToken\":\"ce8de19af18f4417bb68c3632408d4d7.479079475124482181468c8923b636af\"}",
-        signature: "0EC9..." // Rút gọn
+        signature: "0EC9..." // cắt ngắn cho dễ nhìn
       }
     ];
     ws.send(JSON.stringify(authPayload));
@@ -84,6 +83,12 @@ function analyzePrediction() {
   };
 }
 
+// Route test
+fastify.get("/", async () => {
+  return { status: "✅ Bot Tài Xỉu đang hoạt động trên Replit" };
+});
+
+// API chính
 fastify.get("/api/taixiu", async () => {
   const current = lastResults[0];
   if (!current) {
@@ -113,6 +118,7 @@ fastify.get("/api/taixiu", async () => {
   };
 });
 
-fastify.listen({ port: PORT, host: "0.0.0.0" }).then(addr => {
-  console.log("✅ Server đang chạy tại:", addr);
+// Start
+fastify.listen({ port: PORT, host: "0.0.0.0" }, () => {
+  console.log("✅ Bot Tài Xỉu đang chạy tại cổng", PORT);
 });
