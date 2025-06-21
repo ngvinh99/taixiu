@@ -1,3 +1,5 @@
+// ==== DỰ ĐOÁN TÀI XỈU SUNWIN - HOÀN CHỈNH ====
+
 const Fastify = require("fastify");
 const WebSocket = require("ws");
 
@@ -74,67 +76,52 @@ function connectWebSocket() {
 
 connectWebSocket();
 
-// ==== Công thức SUNWIN 200K ====
-
 function getTaiXiu(total) {
   return total >= 11 ? "Tài" : "Xỉu";
 }
 
 function duDoanSunwin200k(totals) {
   if (totals.length < 4) return ["Chờ", "Đợi thêm dữ liệu để phân tích cầu."];
-
   const last_4 = totals.slice(-4);
   const last_3 = totals.slice(-3);
   const last_total = totals[totals.length - 1];
   const last_result = getTaiXiu(last_total);
 
-  // Rule 3 - Ngoại lệ A-B-A-A
   if (last_4[0] === last_4[2] && last_4[0] === last_4[3] && last_4[0] !== last_4[1]) {
     return ["Tài", `Cầu đặc biệt ${last_4.join("-")}. Bắt Tài theo công thức.`];
   }
-
-  // Rule 3 - Sandwich A-B-A
   if (last_3[0] === last_3[2] && last_3[0] !== last_3[1]) {
     const predict = last_result === "Tài" ? "Xỉu" : "Tài";
     return [predict, `Cầu sandwich ${last_3.join("-")}. Bẻ cầu!`];
   }
-
-  // Rule 1 - Xuất hiện 7,9,10 trong 3 phiên gần nhất
   const special_nums = [7, 9, 10];
   const count = last_3.filter(t => special_nums.includes(t)).length;
   if (count >= 2) {
     const predict = last_result === "Tài" ? "Xỉu" : "Tài";
     return [predict, `Xuất hiện cặp ${special_nums.join(",")} trong 3 phiên gần nhất. Bẻ cầu!`];
   }
-
-  // Rule 4 - Số lặp lại nhiều
   const last_6 = totals.slice(-6);
   const freq = last_6.filter(t => t === last_total).length;
   if (freq >= 3) {
     return [getTaiXiu(last_total), `Số ${last_total} lặp lại ${freq} lần. Bắt theo cầu nghiêng.`];
   }
-
-  // Rule 2 - Lặp A-B-A hoặc A-B-B
   if (last_3[0] === last_3[2] || last_3[1] === last_3[2]) {
     const predict = last_result === "Tài" ? "Xỉu" : "Tài";
     return [predict, `Cầu lặp lại ${last_3[1]}-${last_3[2]} hoặc ${last_3[0]}-${last_3[2]}. Bẻ cầu 1-1.`];
   }
-
   const predict = last_result === "Tài" ? "Xỉu" : "Tài";
   return [predict, "Không có cầu đặc biệt, dự đoán theo cầu 1-1."];
 }
 
 function tinhDoTinCay(pattern) {
-  const recent = pattern.slice(0, -1); // không tính kết quả hiện tại
-  const predicted = pattern[pattern.length - 1]; // kết quả dự đoán
-
+  const patternArr = pattern.split("");
+  const recent = patternArr.slice(0, -1);
+  const predicted = patternArr[patternArr.length - 1];
   const count = recent.filter(p => p === predicted).length;
   return Math.round((count / recent.length) * 100);
 }
 
-// ==== API ====
-
-fastify.get("/api/taixiu", async (request, reply) => {
+fastify.get("/api/concac", async (request, reply) => {
   const validResults = [...lastResults]
     .reverse()
     .filter(item => item.d1 && item.d2 && item.d3);
@@ -178,8 +165,6 @@ fastify.get("/api/taixiu", async (request, reply) => {
     reason: reason
   };
 });
-
-// ==== START SERVER ====
 
 const start = async () => {
   try {
