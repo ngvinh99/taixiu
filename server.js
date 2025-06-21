@@ -1,10 +1,14 @@
 const Fastify = require("fastify");
 const fastify = Fastify({ logger: false });
+
 const PORT = process.env.PORT || 3000;
 
+// Lưu kết quả
 let lastResults = [];
 
-// GIỮ NGUYÊN THUẬT TOÁN
+// ==============================
+// GIỮ NGUYÊN THUẬT TOÁN ĐÃ CHO
+// ==============================
 function multiWindowV3(patternArr, windows = [5, 10, 20, 30, 50]) {
   const voteCounts = { Tài: 0, Xỉu: 0 };
   let totalWeight = 0;
@@ -43,7 +47,7 @@ function multiWindowV3(patternArr, windows = [5, 10, 20, 30, 50]) {
   return { prediction: finalPredict, confidence };
 }
 
-// Dummy functions (bạn cần thay bằng thuật toán thật)
+// Dummy functions (bạn thay bằng logic thật nếu có)
 function markovWeightedV3(pattern) {
   return Math.random() > 0.5 ? "Tài" : "Xỉu";
 }
@@ -53,6 +57,10 @@ function repeatingPatternV3(pattern) {
 function detectBiasV3(pattern) {
   return Math.random() > 0.5 ? "Tài" : "Xỉu";
 }
+
+// ==============================
+// API Routes
+// ==============================
 
 // Thêm kết quả thủ công để test
 fastify.post("/add", async (request, reply) => {
@@ -65,25 +73,27 @@ fastify.post("/add", async (request, reply) => {
   return reply.send({ added: result, total: lastResults.length });
 });
 
-// Lấy dự đoán
+// Dự đoán
 fastify.get("/predict", async (request, reply) => {
   if (lastResults.length < 10) {
-    return reply.send({ error: "Không đủ dữ liệu để dự đoán (tối thiểu 10 kết quả)" });
+    return reply.send({ error: "Không đủ dữ liệu để dự đoán (cần ít nhất 10 kết quả)" });
   }
   const res = multiWindowV3(lastResults);
   return reply.send(res);
 });
 
-// Kiểm tra server
+// Kiểm tra server sống
 fastify.get("/", async (request, reply) => {
   reply.send({ status: "Server is running." });
 });
 
-// Khởi chạy server
-fastify.listen({ port: PORT }, (err, address) => {
+// ==============================
+// Chạy đúng cổng và host Render yêu cầu
+// ==============================
+fastify.listen({ port: PORT, host: '0.0.0.0' }, (err, address) => {
   if (err) {
     console.error(err);
     process.exit(1);
   }
-  console.log("Server listening at", address);
+  console.log(`✅ Server is running at ${address}`);
 });
