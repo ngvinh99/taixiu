@@ -7,8 +7,8 @@ const PORT = 3000;
 
 function duDoanTuPattern(pattern13) {
   try {
-    const duDoanData = fs.readFileSync("du_doan.txt", "utf8");
-    const line = duDoanData.split("\n").find(line => line.startsWith(pattern13));
+    const data = fs.readFileSync("du_doan.txt", "utf8");
+    const line = data.split("\n").find(line => line.startsWith(pattern13));
     if (!line) return null;
     if (line.includes("Dự đoán: T")) return "Tài";
     if (line.includes("Dự đoán: X")) return "Xỉu";
@@ -36,7 +36,7 @@ function connectWebSocket() {
     const authPayload = [
       1, "MiniGame", "SC_xigtupou", "conga999", {
         info: "{\"ipAddress\":\"171.246.10.199\",\"userId\":\"7c54ec3f-ee1a-428c-a56e-1bc14fd27e57\",\"username\":\"SC_xigtupou\",\"timestamp\":1748266471861,\"refreshToken\":\"ce8de19af18f4417bb68c3632408d4d7.479079475124482181468c8923b636af\"}",
-        signature: "0EC9..." // cắt bớt cho ngắn
+        signature: "0EC9..." // cắt ngắn
       }
     ];
     ws.send(JSON.stringify(authPayload));
@@ -59,7 +59,7 @@ function connectWebSocket() {
   });
 
   ws.on("close", () => {
-    console.warn("❌ WebSocket closed, reconnecting...");
+    console.warn("❌ WebSocket closed. Reconnecting...");
     clearInterval(intervalCmd);
     setTimeout(connectWebSocket, 5000);
   });
@@ -77,9 +77,7 @@ fastify.get("/", async () => {
 });
 
 fastify.get("/api/taixiu", async () => {
-  const validResults = [...lastResults]
-    .reverse()
-    .filter(item => item.d1 && item.d2 && item.d3);
+  const validResults = [...lastResults].filter(item => item.d1 && item.d2 && item.d3);
 
   if (validResults.length < 13) {
     return {
@@ -88,7 +86,7 @@ fastify.get("/api/taixiu", async () => {
       next_session: null,
       prediction: null,
       used_pattern: "",
-      reason: "❗ Chưa đủ 13 phiên để dự đoán"
+      reason: "❗ Chưa đủ 13 phiên gần nhất"
     };
   }
 
@@ -98,9 +96,10 @@ fastify.get("/api/taixiu", async () => {
   const currentSession = current.sid;
   const nextSession = currentSession + 1;
 
-  const pattern13 = validResults.slice(0, 13)
+  const pattern13 = validResults
+    .slice(0, 13)
     .map(r => (r.d1 + r.d2 + r.d3) >= 11 ? "T" : "X")
-    .reverse()
+    .reverse() // đảo lại từ cũ → mới
     .join("");
 
   const prediction = duDoanTuPattern(pattern13);
@@ -111,7 +110,7 @@ fastify.get("/api/taixiu", async () => {
     next_session: nextSession,
     prediction,
     used_pattern: pattern13,
-    reason: prediction ? "✅ Khớp công thức từ file" : "❌ Không khớp công thức nào"
+    reason: prediction ? "✅ Khớp file công thức" : "❌ Không khớp pattern nào"
   };
 });
 
