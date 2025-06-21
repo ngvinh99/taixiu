@@ -8777,7 +8777,7 @@ function connectWebSocket() {
 
 connectWebSocket();
 
-fastify.get("/api/taixiu", async (request, reply) => {
+fastify.get("/api/concac", async (request, reply) => {
   const validResults = [...lastResults].reverse().filter(item => item.d1 && item.d2 && item.d3);
   if (validResults.length < 1) {
     return {
