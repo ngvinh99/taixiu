@@ -6,8 +6,8 @@ const PORT = process.env.PORT || 3000;
 
 let lastResults = [];
 let ws = null;
-let intervalCmd = null;
 let reconnectInterval = 5000;
+let intervalCmd = null;
 
 const duDoanData = [
   { pattern: "TTTTTTTTTTTTT", predict: "Tài" },
@@ -23,11 +23,12 @@ function sendCmd1005() {
 
 function connectWebSocket() {
   ws = new WebSocket("wss://websocket.azhkthg1.net/websocket");
+
   ws.on("open", () => {
-    console.log("✅ Đã kết nối WebSocket");
+    console.log("✅ WebSocket connected");
     ws.send(JSON.stringify([
       1, "MiniGame", "SC_xigtupou", "conga999", {
-        info: "{\"ipAddress\":\"171.246.10.199\",\"userId\":\"7c54ec3f-ee1a-428c-a56e-1bc14fd27e57\",\"username\":\"SC_xigtupou\",\"timestamp\":1748266471861,\"refreshToken\":\"ce8de19af18f4417bb68c3632408d4d7.479079475124482181468c8923b636af\"}",
+        info: "{\"ipAddress\":\"171.246.10.199\",\"userId\":\"7c54ec3f-ee1a-428c-a56e-1bc14fd27e57\",\"username\":\"SC_xigtupou\",\"timestamp\":1748266471861,\"refreshToken\":\"...\"}",
         signature: "..."
       }
     ]));
@@ -36,6 +37,7 @@ function connectWebSocket() {
   });
 
   ws.on("message", data => {
+    console.log("📥 WebSocket data:", data); // Log dữ liệu nhận được
     try {
       const json = JSON.parse(data);
       if (Array.isArray(json) && json[1]?.htr) {
@@ -52,20 +54,21 @@ function connectWebSocket() {
   });
 
   ws.on("close", () => {
-    console.warn("⚠️ WebSocket đóng, thử lại...");
+    console.warn("⚠️ WebSocket closed. Reconnecting...");
     clearInterval(intervalCmd);
     setTimeout(connectWebSocket, reconnectInterval);
   });
 
   ws.on("error", err => {
-    console.error("❌ WebSocket lỗi:", err.message);
+    console.error("❌ WebSocket error:", err.message);
     ws.close();
   });
 }
 connectWebSocket();
 
-fastify.get("/api/taixiu", async (req, reply) => {
+fastify.get("/api/taixiu", async () => {
   const validResults = [...lastResults].reverse().filter(r => r.d1 && r.d2 && r.d3);
+
   if (validResults.length < 1) {
     return { current_result: null, current_session: null, phien_hien_tai: null, du_doan: null, used_pattern: "" };
   }
@@ -79,7 +82,6 @@ fastify.get("/api/taixiu", async (req, reply) => {
   }
 
   const pattern = rawPattern.reverse().join("");
-
   const found = duDoanData.find(item => pattern.endsWith(item.pattern));
   const duDoan = found ? found.predict : null;
 
@@ -98,7 +100,7 @@ fastify.get("/api/taixiu", async (req, reply) => {
 const start = async () => {
   try {
     const address = await fastify.listen({ port: PORT, host: "0.0.0.0" });
-    console.log(`🚀 Server chạy tại ${address}`);
+    console.log(`🚀 Server running at ${address}`);
   } catch (err) {
     console.error(err);
     process.exit(1);
