@@ -170,7 +170,7 @@ function duDoanSunwin200kVip(totalsList) {
   };
 }
 
-fastify.get("/api/concac", async (request, reply) => {
+fastify.get("/api/hahasunvip", async (request, reply) => {
   const validResults = [...lastResults]
     .reverse()
     .filter(item => item.d1 && item.d2 && item.d3);
