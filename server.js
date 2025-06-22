@@ -132,6 +132,7 @@ function connectHitWebSocket() {
   hitWS = new WebSocket("wss://mynygwais.hytsocesk.com/websocket");
 
   hitWS.on("open", () => {
+    console.log("✅ WebSocket connected!");
     const authPayload = [1, "MiniGame", "", "", {
       agentId: "1",
       accessToken: "1-09550db2f0fdefee91926e37242e20aa",
@@ -150,6 +151,7 @@ function connectHitWebSocket() {
     try {
       const json = JSON.parse(data);
       if (Array.isArray(json) && json[1]?.htr) {
+        console.log("📨 Nhận dữ liệu:", json[1].htr.length, "phiên");
         hitResults = json[1].htr.map((item) => ({
           sid: item.sid,
           d1: item.d1,
@@ -157,15 +159,19 @@ function connectHitWebSocket() {
           d3: item.d3,
         }));
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("❌ Lỗi xử lý message:", e);
+    }
   });
 
   hitWS.on("close", () => {
+    console.log("🔌 WebSocket đóng. Đang reconnect...");
     clearInterval(hitInterval);
     setTimeout(connectHitWebSocket, 5000);
   });
 
-  hitWS.on("error", () => {
+  hitWS.on("error", (err) => {
+    console.error("🚨 Lỗi WebSocket:", err);
     hitWS.close();
   });
 }
@@ -213,7 +219,7 @@ fastify.get("/api/hit", async (request, reply) => {
 const start = async () => {
   try {
     const address = await fastify.listen({ port: PORT, host: "0.0.0.0" });
-    console.log(`Fastify server đang chạy tại ${address}`);
+    console.log(`🚀 Fastify server đang chạy tại ${address}`);
   } catch (err) {
     console.error(err);
     process.exit(1);
