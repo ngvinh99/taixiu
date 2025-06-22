@@ -1,7 +1,5 @@
-
 const Fastify = require("fastify");
 const WebSocket = require("ws");
-const { Counter } = require("collections/counter");
 
 const fastify = Fastify({ logger: false });
 const PORT = process.env.PORT || 3003;
