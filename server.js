@@ -9,7 +9,7 @@ let hitWS = null;
 let hitInterval = null;
 
 function connectHitWebSocket() {
-  hitWS = new WebSocket("wss://ws01-b.wsmt8g.cc/socket.io/?token=1-a885d682c7ce1daf84210a57197a3e32&sv=v5&env=portal&games=all&ssid=e9696ada82bf43fba82ce72cde4a8c82&EIO=3&transport=websocket&t=PUN1Dqi");
+  hitWS = new WebSocket("wss://ws01-b.wsmt8g.cc/socket.io/");
 
   hitWS.on("open", () => {
     const authPayload = [
