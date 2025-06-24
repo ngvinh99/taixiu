@@ -1,78 +1,65 @@
 const Fastify = require("fastify");
-const WebSocket = require("ws");
+const io = require("socket.io-client");
 
 const fastify = Fastify({ logger: false });
-const PORT = process.env.PORT || 3005;
+const PORT = process.env.PORT || 3009;
 
-let results = [];
-let ws = null;
-let interval = null;
+// ======= TOKEN & WS URL ========
+const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb2RlIjowLCJtZXNzYWdlIjoiU3VjY2VzcyIsIm5pY2tOYW1lIjoiQmFvZ2lhODI4IiwiYWNjZXNzVG9rZW4iOiJjNTUwNWY2ZWY2MTRlYjU3OWM3NmM1Yjk2ZTIyMDYyNCIsImlzTG9naW4iOnRydWUsIm1vbmV5IjowLCJpZCI6Ijc1NDA5MTMiLCJ1c2VybmFtZSI6Im1pc3M4OCIsImlhdCI6MTc1MDc3MzE4OCwiZXhwIjoxNzUwODAxOTg4fQ.l0SyhKsssk_83aNpYfQxUNuLe87AgGIHWaTtnglF198";
+const SOCKET_URL = "wss://wtxmd52.tele68.com/txmd5/?EIO=4&transport=websocket";
 
-function connect() {
-  ws = new WebSocket("wss://myniskgw.ryksockesg.net/websocket");
+// ======= BIẾN DỮ LIỆU ========
+let currentResult = null;
+let currentSession = null;
+let prediction = null;
+let patternList = [];
 
-  ws.on("open", () => {
-    console.log("✅ Đã kết nối WebSocket Tài Xỉu mới");
-
-    // Gửi payload xác thực mới
-    const authPayload = [
-      1,
-      "MiniGame",
-      "",
-      "",
-      {
-        agentId: "1",
-        accessToken: "29-962f1eff13b3b0f232aef00105f7c020",
-        reconnect: false,
-      },
-    ];
-    ws.send(JSON.stringify(authPayload));
-
-    // Gửi payload lấy lịch sử sau 1 giây, rồi đều đặn 5s/lần
-    setTimeout(sendHistoryRequest, 1000);
-    interval = setInterval(sendHistoryRequest, 5000);
-  });
-
-  ws.on("message", (data) => {
-    try {
-      const json = JSON.parse(data);
-      if (Array.isArray(json) && json[1]?.htr && Array.isArray(json[1].htr)) {
-        results = json[1].htr.map((item) => ({
-          sid: item.sid,
-          d1: item.d1,
-          d2: item.d2,
-          d3: item.d3,
-        }));
-        console.log(`🔄 Cập nhật lịch sử Tài Xỉu: ${results.length} bản ghi`);
-      }
-    } catch (e) {
-      // ignore lỗi parse
-    }
-  });
-
-  ws.on("close", () => {
-    console.warn("🔌 WebSocket đóng kết nối, thử lại sau 5s...");
-    clearInterval(interval);
-    setTimeout(connect, 5000);
-  });
-
-  ws.on("error", (err) => {
-    console.error("❌ Lỗi WebSocket:", err.message);
-    ws.close();
-  });
+function getTaiXiu(total) {
+  return total >= 11 ? "Tài" : "Xỉu";
 }
 
-function sendHistoryRequest() {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    const payload = [6, "MiniGame", "taixiuPlugin", { cmd: 1005 }];
-    ws.send(JSON.stringify(payload));
+// ======= KẾT NỐI SOCKET ========
+const socket = io("https://wtxmd52.tele68.com/txmd5", {
+  transports: ["websocket"],
+  extraHeaders: {
+    Authorization: `Bearer ${TOKEN}`,
+  },
+});
+
+socket.on("connect", () => {
+  console.log("✅ Socket.IO đã kết nối");
+});
+
+socket.on("disconnect", () => {
+  console.log("🔌 Mất kết nối socket");
+});
+
+socket.on("txmd5", (data) => {
+  try {
+    // Bạn cần in ra để kiểm tra cấu trúc thật của `data`
+    console.log("📥 Dữ liệu nhận được:", data);
+
+    const { sid, d1, d2, d3 } = data;
+
+    if ([sid, d1, d2, d3].some((v) => v === undefined)) return;
+
+    currentSession = sid;
+    const total = d1 + d2 + d3;
+    currentResult = getTaiXiu(total);
+    prediction = currentResult === "Tài" ? "Xỉu" : "Tài";
+
+    patternList.unshift(currentResult === "Tài" ? "T" : "X");
+    if (patternList.length > 6) patternList.pop();
+
+    console.log(`🎲 Phiên ${sid} - ${d1},${d2},${d3} → ${currentResult}`);
+  } catch (err) {
+    console.error("❌ Lỗi xử lý dữ liệu socket:", err.message);
   }
-}
+});
 
-connect();
-
-fastify.get("/api/taixiu", async () => {
-  if (!results.length) {
+// ======= API ROUTE ========
+fastify.get("/api/tx", async () => {
+  if (!currentResult || !currentSession) {
     return {
       current_result: null,
       current_session: null,
@@ -81,42 +68,25 @@ fastify.get("/api/taixiu", async () => {
       used_pattern: "",
     };
   }
-
-  const validResults = results
-    .filter((r) => r.d1 != null && r.d2 != null && r.d3 != null)
-    .slice(0, 6);
-
-  if (!validResults.length) {
-    return {
-      current_result: null,
-      current_session: null,
-      next_session: null,
-      prediction: null,
-      used_pattern: "",
-    };
-  }
-
-  const current = validResults[0];
-  const total = current.d1 + current.d2 + current.d3;
-  const currentResult = total >= 11 ? "Tài" : "Xỉu";
-  const currentSession = current.sid;
-  const nextSession = currentSession + 1;
-  const prediction = currentResult === "Tài" ? "Xỉu" : "Tài";
-
-  const pattern = validResults
-    .map((r) => (r.d1 + r.d2 + r.d3 >= 11 ? "T" : "X"))
-    .reverse()
-    .join("");
 
   return {
     current_result: currentResult,
     current_session: currentSession,
-    next_session: nextSession,
-    prediction: prediction,
-    used_pattern: pattern,
+    next_session: currentSession + 1,
+    prediction,
+    used_pattern: patternList.slice(0, 6).reverse().join(""),
   };
 });
 
-fastify.listen({ port: PORT, host: "0.0.0.0" }).then(({ url }) => {
-  console.log(`🚀 Server chạy tại ${url}`);
-});
+// ======= START SERVER ========
+const start = async () => {
+  try {
+    await fastify.listen({ port: PORT, host: "0.0.0.0" });
+    console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
+  } catch (err) {
+    console.error("❌ Lỗi khởi chạy:", err);
+    process.exit(1);
+  }
+};
+
+start();
