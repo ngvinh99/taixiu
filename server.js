@@ -42,24 +42,27 @@ function connectB52WebSocket() {
     try {
       const json = JSON.parse(data);
       if (Array.isArray(json) && json[1]?.htr) {
-        // Lấy phần tử mới nhất (index 0)
         const latest = json[1].htr[0];
-        if (latest && typeof latest.d1 === "number" && typeof latest.d2 === "number" && typeof latest.d3 === "number" && latest.sid) {
+        if (
+          latest &&
+          typeof latest.d1 === "number" &&
+          typeof latest.d2 === "number" &&
+          typeof latest.d3 === "number" &&
+          latest.sid
+        ) {
           b52LatestDice = {
             d1: latest.d1,
             d2: latest.d2,
             d3: latest.d3,
           };
           b52CurrentSession = latest.sid;
-
-          // Nếu có MD5 trong dữ liệu, gán luôn, giả sử json[1].md5 có thể tồn tại
           if (json[1].md5) {
             b52CurrentMD5 = json[1].md5;
           }
         }
       }
     } catch (e) {
-      // im lặng lỗi parse
+      // ignore parse error
     }
   });
 
@@ -68,7 +71,7 @@ function connectB52WebSocket() {
     setTimeout(connectB52WebSocket, b52ReconnectInterval);
   });
 
-  b52WS.on("error", (err) => {
+  b52WS.on("error", () => {
     b52WS.close();
   });
 }
@@ -78,6 +81,7 @@ connectB52WebSocket();
 fastify.get("/api/b52", async (request, reply) => {
   if (!b52LatestDice || !b52CurrentSession) {
     return {
+      id: "@axobantool",
       d1: null,
       d2: null,
       d3: null,
@@ -87,6 +91,7 @@ fastify.get("/api/b52", async (request, reply) => {
   }
 
   return {
+    id: "@axobantool",
     d1: b52LatestDice.d1,
     d2: b52LatestDice.d2,
     d3: b52LatestDice.d3,
