@@ -13,28 +13,40 @@ let ws = null;
 
 function connectWebSocket() {
   const socketUrl = "wss://dicemd5.79club8.club/w-chattx/signalr/connect?connectionToken=a33b9d60-11db-42eb-a8dd-c7494d8f2679";
+
   ws = new WebSocket(socketUrl);
 
   ws.on("open", () => {
     console.log("✅ Đã kết nối WebSocket LuckyDice");
 
-    // Gửi lệnh ping
     const pingMsg = JSON.stringify({
       H: "md5luckydiceHub",
       M: "PingPong",
-      A: "",
+      A: [],
       I: 2
     });
+
     ws.send(pingMsg);
   });
 
   ws.on("message", (data) => {
     try {
-      const json = JSON.parse(data);
+      const text = data.toString();
+
+      // Đảm bảo đây là JSON hợp lệ
+      if (!text.includes("Md5sessionInfo")) return;
+
+      const json = JSON.parse(text);
       if (!json.M || !Array.isArray(json.M)) return;
 
       json.M.forEach((msg) => {
-        if (msg.H === "md5luckydiceHub" && msg.M === "Md5sessionInfo" && Array.isArray(msg.A)) {
+        if (
+          msg.H === "md5luckydiceHub" &&
+          msg.M === "Md5sessionInfo" &&
+          Array.isArray(msg.A) &&
+          msg.A[0] &&
+          msg.A[0].SessionID
+        ) {
           const session = msg.A[0];
           const sid = session.SessionID;
           const result = session.Result || {};
@@ -54,20 +66,22 @@ function connectWebSocket() {
             lastPattern.unshift(currentResult === "Tài" ? "T" : "X");
             if (lastPattern.length > 6) lastPattern.pop();
 
-            console.log(`Phiên: ${sid} - Dice: ${d1},${d2},${d3} = ${sum} → ${currentResult}`);
+            console.log(`🎲 Phiên: ${sid} - Dice: ${d1},${d2},${d3} = ${sum} → ${currentResult}`);
           }
         }
       });
-    } catch (e) {}
+    } catch (e) {
+      console.error("❌ JSON parse error:", e.message);
+    }
   });
 
   ws.on("close", () => {
-    console.warn("🔌 WebSocket bị đóng. Đang thử kết nối lại...");
+    console.warn("🔌 WebSocket đóng kết nối. Tự động thử lại sau 5s...");
     setTimeout(connectWebSocket, 5000);
   });
 
   ws.on("error", (err) => {
-    console.error("❌ Lỗi WebSocket:", err.message);
+    console.error("❌ WebSocket lỗi:", err.message);
     ws.close();
   });
 }
@@ -97,9 +111,9 @@ fastify.get("/api/luckydice", async (request, reply) => {
 const start = async () => {
   try {
     const addr = await fastify.listen({ port: PORT, host: "0.0.0.0" });
-    console.log(`🎲 LuckyDice API đang chạy tại ${addr}`);
+    console.log(`🚀 LuckyDice API đang chạy tại ${addr}`);
   } catch (err) {
-    console.error(err);
+    console.error("❌ Server error:", err);
     process.exit(1);
   }
 };
