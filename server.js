@@ -81,22 +81,22 @@ connectB52WebSocket();
 fastify.get("/api/b52", async (request, reply) => {
   if (!b52LatestDice || !b52CurrentSession) {
     return {
-      id: "@axobantool",
+      phien: null,
+      ma_md5: b52CurrentMD5 || null,
       d1: null,
       d2: null,
       d3: null,
-      current_session: null,
-      current_md5: b52CurrentMD5 || null,
+      id: "@axobantool"
     };
   }
 
   return {
-    id: "@axobantool",
+    phien: b52CurrentSession,
+    ma_md5: b52CurrentMD5 || null,
     d1: b52LatestDice.d1,
     d2: b52LatestDice.d2,
     d3: b52LatestDice.d3,
-    current_session: b52CurrentSession,
-    current_md5: b52CurrentMD5 || null,
+    id: "@axobantool"
   };
 });
 
