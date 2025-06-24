@@ -2,7 +2,7 @@ const Fastify = require("fastify");
 const WebSocket = require("ws");
 
 const fastify = Fastify({ logger: false });
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 let b52LatestDice = null;
 let b52CurrentSession = null;
@@ -29,7 +29,7 @@ function connectB52WebSocket() {
       "",
       {
         agentId: "1",
-        accessToken: "13-9623162d7b104cce1c6b9150afd52596",
+        accessToken: "13-a8f8e182af0e44fa0eaceaa8595f6aa9",
         reconnect: false,
       },
     ];
