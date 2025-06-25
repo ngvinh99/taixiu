@@ -148,7 +148,7 @@ function duDoan(totalsList) {
   };
 }
 
-fastify.get("/api/taixiu", async (req, rep) => {
+fastify.get("/api/hahasunvip", async (req, rep) => {
   const valid = [...lastResults].reverse().filter((i) => i.d1 && i.d2 && i.d3);
 
   if (!valid.length) {
