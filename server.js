@@ -1,4 +1,3 @@
-
 const Fastify = require("fastify");
 const WebSocket = require("ws");
 
@@ -12,14 +11,6 @@ let currentSession = null;
 let ws = null;
 let reconnectInterval = 5000;
 let intervalCmd = null;
-
-function getTaiXiu(total) {
-  return total >= 11 ? "Tài" : "Xỉu";
-}
-
-function isOdd(n) {
-  return n % 2 !== 0;
-}
 
 function sendCmd1005() {
   if (ws && ws.readyState === WebSocket.OPEN) {
@@ -40,10 +31,8 @@ function connectWebSocket() {
       "SC_xigtupou",
       "conga999",
       {
-        info:
-          "{\"ipAddress\":\"171.246.10.199\",\"userId\":\"7c54ec3f-ee1a-428c-a56e-1bc14fd27e57\",\"username\":\"SC_xigtupou\",\"timestamp\":1748266471861,\"refreshToken\":\"ce8de19af18f4417bb68c3632408d4d7.479079475124482181468c8923b636af\"}",
-        signature:
-          "0EC9E9B2311CD352561D9556F88F6AB4167502EAC5F9767D07D43E521FE1BA056C7C67DF0491D20BCE9877B71373A2115CC61E9ED43B8AF1EF6EAC3757EA5B2A46BCB0C519EDCB46DB0EB9ACA445D7076CC1F3F830745609C02BE9F4D86CF419924E33EE3398F1EE4FE65FD045C1A2EE05C85CDBF2EAE6E4297E000664E4CC21"
+        info: "{\"ipAddress\":\"171.246.10.199\",\"userId\":\"7c54ec3f-ee1a-428c-a56e-1bc14fd27e57\",\"username\":\"SC_xigtupou\",\"timestamp\":1748266471861,\"refreshToken\":\"ce8de19af18f4417bb68c3632408d4d7.479079475124482181468c8923b636af\"}",
+        signature: "0EC9E9B2311CD352561D9556F88F6AB4167502EAC5F9767D07D43E521FE1BA056C7C67DF0491D20BCE9877B71373A2115CC61E9ED43B8AF1EF6EAC3757EA5B2A46BCB0C519EDCB46DB0EB9ACA445D7076CC1F3F830745609C02BE9F4D86CF419924E33EE3398F1EE4FE65FD045C1A2EE05C85CDBF2EAE6E4297E000664E4CC21"
       }
     ];
 
@@ -85,6 +74,10 @@ function connectWebSocket() {
 
 connectWebSocket();
 
+function getTaiXiu(total) {
+  return total >= 11 ? "Tài" : "Xỉu";
+}
+
 function taiXiuStats(totalsList) {
   const types = totalsList.map(getTaiXiu);
   const count = {};
@@ -105,8 +98,8 @@ function taiXiuStats(totalsList) {
   };
 }
 
-function duDoanSunwin200kVip(totalsList, sessionsList, diceList) {
-  if (totalsList.length < 10) {
+function duDoanSunwin200kVip(totalsList) {
+  if (totalsList.length < 4) {
     return {
       prediction: "Chờ",
       confidence: 0,
@@ -115,31 +108,64 @@ function duDoanSunwin200kVip(totalsList, sessionsList, diceList) {
     };
   }
 
-  const lastTotal = totalsList[0];
-  const lastSid = sessionsList[0];
-  const dice = diceList[0];
+  const last4 = totalsList.slice(-4);
+  const last3 = totalsList.slice(-3);
+  const last6 = totalsList.slice(-6);
+  const lastTotal = totalsList[totalsList.length - 1];
+  const lastResult = getTaiXiu(lastTotal);
 
-  let sum1 = (lastSid % 10) + lastTotal;
-  if ([8, 12, 16, 20, 22].includes(sum1)) sum1 -= 5;
-  const rule1_result = isOdd(sum1) ? "Tài" : "Xỉu";
-
-  let sum2 = lastSid + dice.d2;
-  if ([5, 8, 9, 13].includes(sum2)) sum2 -= 3;
-  const rule2_result = sum2 % 2 === 0 ? "Tài" : "Xỉu";
-
-  if (rule1_result === rule2_result) {
+  if (last4[0] === last4[2] && last4[0] === last4[3] && last4[0] !== last4[1]) {
     return {
-      prediction: rule1_result,
-      confidence: 90,
-      reason: `Thuật toán đặc biệt: Rule1 (${rule1_result}), Rule2 (${rule2_result}) ⇒ Khớp.`,
+      prediction: "Tài",
+      confidence: 85,
+      reason: `Cầu đặc biệt ${last4}. Bắt Tài.`,
+      history_summary: taiXiuStats(totalsList)
+    };
+  }
+
+  if (last3[0] === last3[2] && last3[0] !== last3[1]) {
+    return {
+      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
+      confidence: 83,
+      reason: `Cầu sandwich ${last3}.`,
+      history_summary: taiXiuStats(totalsList)
+    };
+  }
+
+  const specialNums = [7, 9, 10];
+  const count = last3.filter(t => specialNums.includes(t)).length;
+  if (count >= 2) {
+    return {
+      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
+      confidence: 81,
+      reason: `Xuất hiện nhiều số đặc biệt (${specialNums.join(",")}) gần đây.`,
+      history_summary: taiXiuStats(totalsList)
+    };
+  }
+
+  const freq = last6.filter(t => t === lastTotal).length;
+  if (freq >= 3) {
+    return {
+      prediction: getTaiXiu(lastTotal),
+      confidence: 80,
+      reason: `Số ${lastTotal} lặp lại ${freq} lần.`,
+      history_summary: taiXiuStats(totalsList)
+    };
+  }
+
+  if (last3[0] === last3[2] || last3[1] === last3[2]) {
+    return {
+      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
+      confidence: 77,
+      reason: `Cầu lặp lại ${last3}.`,
       history_summary: taiXiuStats(totalsList)
     };
   }
 
   return {
-    prediction: rule1_result,
-    confidence: 75,
-    reason: `Rule1 (${rule1_result}) khác Rule2 (${rule2_result}), ưu tiên Rule1.`,
+    prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
+    confidence: 71,
+    reason: "Không có cầu đặc biệt, bẻ cầu mặc định.",
     history_summary: taiXiuStats(totalsList)
   };
 }
@@ -162,9 +188,7 @@ fastify.get("/api/hahasunvip", async (request, reply) => {
   }
 
   const totals = validResults.map(item => item.d1 + item.d2 + item.d3);
-  const sessions = validResults.map(item => item.sid);
-  const diceList = validResults.map(item => ({ d1: item.d1, d2: item.d2, d3: item.d3 }));
-  const predictionData = duDoanSunwin200kVip(totals, sessions, diceList);
+  const predictionData = duDoanSunwin200kVip(totals);
 
   const current = validResults[0];
   const total = current.d1 + current.d2 + current.d3;
