@@ -1,3 +1,4 @@
+
 const Fastify = require("fastify");
 const WebSocket = require("ws");
 
@@ -15,7 +16,7 @@ function sendCmd1005() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     const payload = [6, "MiniGame", "taixiuPlugin", { cmd: 1005 }];
     ws.send(JSON.stringify(payload));
-    console.log("📤 Đã gửi lệnh cmd:1005");
+    console.log("📤 Gửi cmd:1005");
   }
 }
 
@@ -23,7 +24,7 @@ function connectWebSocket() {
   ws = new WebSocket("wss://websocket.azhkthg1.net/websocket");
 
   ws.on("open", () => {
-    console.log("✅ WebSocket kết nối thành công");
+    console.log("✅ Đã kết nối WebSocket");
 
     const authPayload = [
       1,
@@ -57,21 +58,21 @@ function connectWebSocket() {
         currentResult = getTaiXiu(total);
         currentSession = latest.sid;
 
-        console.log(`🎲 Phiên ${currentSession} = ${latest.d1}+${latest.d2}+${latest.d3} = ${total} → ${currentResult}`);
+        console.log(`🎲 Phiên ${currentSession}: ${latest.d1}+${latest.d2}+${latest.d3} = ${total} → ${currentResult}`);
       }
     } catch (err) {
-      console.log("❌ Lỗi parse dữ liệu:", err.message);
+      console.log("❌ Lỗi xử lý dữ liệu:", err.message);
     }
   });
 
   ws.on("close", () => {
-    console.warn("⚠️ WebSocket bị đóng, thử lại sau 5s...");
+    console.warn("⚠️ WebSocket đóng, thử lại sau 5s...");
     clearInterval(intervalCmd);
     setTimeout(connectWebSocket, reconnectInterval);
   });
 
   ws.on("error", (err) => {
-    console.error("❌ WebSocket lỗi:", err.message);
+    console.error("❌ Lỗi WebSocket:", err.message);
     ws.close();
   });
 }
@@ -84,45 +85,56 @@ function smartPredict(history) {
   if (history.length < 10) return ["📉 Chưa đủ dữ liệu để dự đoán.", null];
 
   const last10 = history.slice(-10);
-  const tx = last10.map(v => v >= 11 ? "TÀI" : "XỈU");
+  const tai_xiu = last10.map(v => v >= 11 ? "TÀI" : "XỈU");
 
   const weights = Array.from({ length: 10 }, (_, i) => 10 - i);
   const score = { "TÀI": 0, "XỈU": 0 };
-  tx.forEach((v, i) => score[v] += weights[i]);
+  for (let i = 0; i < 10; i++) {
+    score[tai_xiu[i]] += weights[i];
+  }
 
-  const last = tx[tx.length - 1];
+  const last_result = tai_xiu[tai_xiu.length - 1];
   let streak = 1;
-  for (let i = tx.length - 2; i >= 0; i--) {
-    if (tx[i] === last) streak++; else break;
+  for (let i = tai_xiu.length - 2; i >= 0; i--) {
+    if (tai_xiu[i] === last_result) {
+      streak++;
+    } else {
+      break;
+    }
   }
 
   if (streak >= 4) {
-    const predicted = last === "TÀI" ? "XỈU" : "TÀI";
-    return [`🔁 Chuỗi ${streak} ${last} → Đảo chiều: ${predicted}`, predicted];
+    const predicted = last_result === "TÀI" ? "XỈU" : "TÀI";
+    return [`🔁 Chuỗi ${streak} ${last_result} → Đảo chiều dự đoán: ${predicted}`, predicted];
   }
 
   if (Math.abs(score["TÀI"] - score["XỈU"]) >= 12) {
     const predicted = score["TÀI"] > score["XỈU"] ? "TÀI" : "XỈU";
-    return [`📊 Trọng số nghiêng về: ${predicted}`, predicted];
+    return [`📊 Trọng số nghiêng mạnh về: ${predicted}`, predicted];
   }
 
-  const pattern = tx.slice(-6).map(v => v === "TÀI" ? "T" : "X").join("");
-  const traps = ["TXT", "XTX", "TXXT", "XTTX"];
-  if (traps.some(p => pattern.includes(p))) {
-    const predicted = last === "TÀI" ? "XỈU" : "TÀI";
-    return [`🪤 Cầu bẫy (${pattern}) → Đảo: ${predicted}`, predicted];
+  const pattern = tai_xiu.slice(-6).map(v => v === "TÀI" ? "T" : "X").join("");
+  const bait_patterns = ["TXT", "XTX", "TXXT", "XTTX"];
+  if (bait_patterns.some(p => pattern.includes(p))) {
+    const predicted = last_result === "TÀI" ? "XỈU" : "TÀI";
+    return [`🪤 Phát hiện cầu bẫy (${pattern}) → Đảo ngược kết quả: ${predicted}`, predicted];
   }
 
   const predicted = score["TÀI"] > score["XỈU"] ? "TÀI" : "XỈU";
-  return [`🧠 Tổng điểm: TÀI=${score["TÀI"]}, XỈU=${score["XỈU"]} → ${predicted}`, predicted];
+  return [`🧠 Tổng điểm: TÀI=${score["TÀI"]}, XỈU=${score["XỈU"]} → Dự đoán: ${predicted}`, predicted];
 }
 
 fastify.get("/api/hahasunvip", async (req, res) => {
   const valid = [...lastResults].reverse().filter(i => i.d1 && i.d2 && i.d3);
   if (valid.length < 1) {
     return {
-      current_result: null, current_session: null,
-      du_doan: null, do_tin_cay: null, xuc_xac: []
+      current_result: null,
+      current_session: null,
+      phien_hien_tai: null,
+      du_doan: null,
+      do_tin_cay: null,
+      used_pattern: "",
+      xuc_xac: []
     };
   }
 
@@ -152,8 +164,8 @@ fastify.get("/api/hahasunvip", async (req, res) => {
 
 const start = async () => {
   try {
-    const addr = await fastify.listen({ port: PORT, host: "0.0.0.0" });
-    console.log(`🚀 Server đang chạy tại ${addr}`);
+    await fastify.listen({ port: PORT, host: "0.0.0.0" });
+    console.log(`🚀 Server đang chạy tại cổng ${PORT}`);
   } catch (err) {
     console.error(err);
     process.exit(1);
