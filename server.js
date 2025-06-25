@@ -78,23 +78,23 @@ function getTaiXiu(total) {
   return total >= 11 ? "Tài" : "Xỉu";
 }
 
-
 function taiXiuStats(totalsList) {
   const types = totalsList.map(getTaiXiu);
-  const count = types.reduce((acc, t) => {
-    acc[t] = (acc[t] || 0) + 1;
-    return acc;
-  }, {});
-  const totalCount = totalsList.reduce((acc, t) => {
-    acc[t] = (acc[t] || 0) + 1;
-    return acc;
-  }, {});
+  const count = {};
+  types.forEach(t => count[t] = (count[t] || 0) + 1);
+
+  const totalCount = {};
+  totalsList.forEach(t => totalCount[t] = (totalCount[t] || 0) + 1);
+
   const sortedTotals = Object.entries(totalCount).sort((a, b) => b[1] - a[1]);
+  const mostCommonTotal = parseInt(sortedTotals[0][0]);
+  const mostCommonType = (count["Tài"] || 0) >= (count["Xỉu"] || 0) ? "Tài" : "Xỉu";
+
   return {
     tai_count: count["Tài"] || 0,
     xiu_count: count["Xỉu"] || 0,
-    most_common_total: parseInt(sortedTotals[0][0]),
-    most_common_type: (count["Tài"] || 0) >= (count["Xỉu"] || 0) ? "Tài" : "Xỉu"
+    most_common_total: mostCommonTotal,
+    most_common_type: mostCommonType
   };
 }
 
@@ -103,109 +103,13 @@ function duDoanSunwin200kVip(totalsList) {
     return {
       prediction: "Chờ",
       confidence: 0,
-      reason: "Chưa đủ dữ liệu, cần ít nhất 4 phiên.",
+      reason: "Chưa đủ dữ liệu.",
       history_summary: taiXiuStats(totalsList)
-    };
-  }
-
-  const last_4 = totalsList.slice(-4);
-  const last_3 = totalsList.slice(-3);
-  const last_6 = totalsList.slice(-6);
-  const last_total = totalsList[totalsList.length - 1];
-  const last_result = getTaiXiu(last_total);
-
-  function rule_special_pattern() {
-    if (last_4[0] === last_4[2] && last_4[0] === last_4[3] && last_4[0] !== last_4[1]) {
-      return {
-        prediction: "Tài",
-        confidence: 85,
-        reason: `Cầu đặc biệt ${last_4}. Bắt Tài theo công thức đặc biệt.`
-      };
-    }
-  }
-
-  function rule_sandwich() {
-    if (last_3[0] === last_3[2] && last_3[0] !== last_3[1]) {
-      return {
-        prediction: last_result === "Tài" ? "Xỉu" : "Tài",
-        confidence: 83,
-        reason: `Cầu sandwich ${last_3}. Bẻ cầu!`
-      };
-    }
-  }
-
-  function rule_special_numbers() {
-    const special_nums = [7, 9, 10];
-    const count = last_3.filter(t => special_nums.includes(t)).length;
-    if (count >= 2) {
-      return {
-        prediction: last_result === "Tài" ? "Xỉu" : "Tài",
-        confidence: 81,
-        reason: `Xuất hiện ≥2 số đặc biệt ${special_nums.join(",")} gần nhất. Bẻ cầu!`
-      };
-    }
-  }
-
-  function rule_frequent_repeat() {
-    const freq = last_6.filter(t => t === last_total).length;
-    if (freq >= 3) {
-      return {
-        prediction: getTaiXiu(last_total),
-        confidence: 80,
-        reason: `Số ${last_total} lặp lại ${freq} lần. Bắt theo nghiêng cầu!`
-      };
-    }
-  }
-
-  function rule_repeat_pattern() {
-    if (last_3[0] === last_3[2] || last_3[1] === last_3[2]) {
-      return {
-        prediction: last_result === "Tài" ? "Xỉu" : "Tài",
-        confidence: 77,
-        reason: `Cầu lặp dạng ${last_3}. Bẻ cầu theo dạng A-B-B hoặc A-B-A.`
-      };
-    }
-  }
-
-  function rule_default() {
-    return {
-      prediction: last_result === "Tài" ? "Xỉu" : "Tài",
-      confidence: 71,
-      reason: "Không có cầu đặc biệt nào, bẻ cầu mặc định theo 1-1."
-    };
-  }
-
-  const rules = [
-    rule_special_pattern,
-    rule_sandwich,
-    rule_special_numbers,
-    rule_frequent_repeat,
-    rule_repeat_pattern
-  ];
-
-  for (const rule of rules) {
-    const result = rule();
-    if (result) {
-      result.history_summary = taiXiuStats(totalsList);
-      return result;
-    }
-  }
-
-  const result = rule_default();
-  result.history_summary = taiXiuStats(totalsList);
-  return result;
-}
-
-  if (totalsList.length < 4) {
-    return {
-      prediction: "Chờ",
-      reason: "Đợi thêm dữ liệu để phân tích cầu."
     };
   }
 
   const last4 = totalsList.slice(-4);
   const last3 = totalsList.slice(-3);
-  const last2 = totalsList.slice(-2);
   const last6 = totalsList.slice(-6);
   const lastTotal = totalsList[totalsList.length - 1];
   const lastResult = getTaiXiu(lastTotal);
@@ -213,14 +117,18 @@ function duDoanSunwin200kVip(totalsList) {
   if (last4[0] === last4[2] && last4[0] === last4[3] && last4[0] !== last4[1]) {
     return {
       prediction: "Tài",
-      reason: `Cầu đặc biệt ${last4[0]}-${last4[1]}-${last4[0]}-${last4[0]}. Bắt Tài theo công thức.`
+      confidence: 85,
+      reason: `Cầu đặc biệt ${last4}. Bắt Tài.`,
+      history_summary: taiXiuStats(totalsList)
     };
   }
 
   if (last3[0] === last3[2] && last3[0] !== last3[1]) {
     return {
       prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-      reason: `Cầu sandwich ${last3[0]}-${last3[1]}-${last3[0]}. Bẻ cầu!`
+      confidence: 83,
+      reason: `Cầu sandwich ${last3}.`,
+      history_summary: taiXiuStats(totalsList)
     };
   }
 
@@ -229,7 +137,9 @@ function duDoanSunwin200kVip(totalsList) {
   if (count >= 2) {
     return {
       prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-      reason: `Xuất hiện cặp ${specialNums.join(",")} trong 3 phiên gần nhất. Bẻ cầu!`
+      confidence: 81,
+      reason: `Xuất hiện nhiều số đặc biệt (${specialNums.join(",")}) gần đây.`,
+      history_summary: taiXiuStats(totalsList)
     };
   }
 
@@ -237,20 +147,26 @@ function duDoanSunwin200kVip(totalsList) {
   if (freq >= 3) {
     return {
       prediction: getTaiXiu(lastTotal),
-      reason: `Số ${lastTotal} lặp lại ${freq} lần. Bắt theo cầu nghiêng.`
+      confidence: 80,
+      reason: `Số ${lastTotal} lặp lại ${freq} lần.`,
+      history_summary: taiXiuStats(totalsList)
     };
   }
 
   if (last3[0] === last3[2] || last3[1] === last3[2]) {
     return {
       prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-      reason: `Cầu lặp lại ${last3[1]}-${last3[2]} hoặc ${last3[0]}-${last3[2]}. Bẻ cầu 1-1.`
+      confidence: 77,
+      reason: `Cầu lặp lại ${last3}.`,
+      history_summary: taiXiuStats(totalsList)
     };
   }
 
   return {
     prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-    reason: "Không có cầu đặc biệt, dự đoán theo cầu 1-1."
+    confidence: 71,
+    reason: "Không có cầu đặc biệt, bẻ cầu mặc định.",
+    history_summary: taiXiuStats(totalsList)
   };
 }
 
@@ -296,7 +212,8 @@ fastify.get("/api/hahasunvip", async (request, reply) => {
     do_tin_cay: doTinCay + "%",
     used_pattern: pattern,
     xuc_xac: [current.d1, current.d2, current.d3],
-    reason: predictionData.reason
+    reason: predictionData.reason,
+    thong_ke: predictionData.history_summary
   };
 });
 
