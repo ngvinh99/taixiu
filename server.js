@@ -98,8 +98,9 @@ function taiXiuStats(totalsList) {
   };
 }
 
-function duDoanSunwin200kVip(totalsList) {
-  if (totalsList.length < 4) {
+// Dự đoán theo pattern
+function duDoanTheoPattern(totalsList) {
+  if (totalsList.length < 14) {
     return {
       prediction: "Chờ",
       confidence: 0,
@@ -108,64 +109,36 @@ function duDoanSunwin200kVip(totalsList) {
     };
   }
 
-  const last4 = totalsList.slice(-4);
-  const last3 = totalsList.slice(-3);
-  const last6 = totalsList.slice(-6);
-  const lastTotal = totalsList[totalsList.length - 1];
-  const lastResult = getTaiXiu(lastTotal);
+  const patternStr = totalsList
+    .slice(-13)
+    .map(getTaiXiu)
+    .map(k => k === "Tài" ? "T" : "X")
+    .join("");
 
-  if (last4[0] === last4[2] && last4[0] === last4[3] && last4[0] !== last4[1]) {
-    return {
-      prediction: "Tài",
-      confidence: 85,
-      reason: `Cầu đặc biệt ${last4}. Bắt Tài.`,
-      history_summary: taiXiuStats(totalsList)
-    };
-  }
+  // Danh sách pattern mẫu và dự đoán kết quả
+  const patternMap = {
+    "XTXXTXTTXXTTX": "X",
+    "XXTXTTXXXTTXX": "X",
+    "TTXTXTTXTTXXT": "T",
+    "XTTXTXTTXXTXT": "X",
+    "TTXXTTXTXTTTX": "T"
+    // Thêm mẫu tại đây nếu cần...
+  };
 
-  if (last3[0] === last3[2] && last3[0] !== last3[1]) {
-    return {
-      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-      confidence: 83,
-      reason: `Cầu sandwich ${last3}.`,
-      history_summary: taiXiuStats(totalsList)
-    };
-  }
+  let prediction = "Xỉu";
+  let confidence = 70;
+  let reason = "Không khớp mẫu nào, dự đoán mặc định.";
 
-  const specialNums = [7, 9, 10];
-  const count = last3.filter(t => specialNums.includes(t)).length;
-  if (count >= 2) {
-    return {
-      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-      confidence: 81,
-      reason: `Xuất hiện nhiều số đặc biệt (${specialNums.join(",")}) gần đây.`,
-      history_summary: taiXiuStats(totalsList)
-    };
-  }
-
-  const freq = last6.filter(t => t === lastTotal).length;
-  if (freq >= 3) {
-    return {
-      prediction: getTaiXiu(lastTotal),
-      confidence: 80,
-      reason: `Số ${lastTotal} lặp lại ${freq} lần.`,
-      history_summary: taiXiuStats(totalsList)
-    };
-  }
-
-  if (last3[0] === last3[2] || last3[1] === last3[2]) {
-    return {
-      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-      confidence: 77,
-      reason: `Cầu lặp lại ${last3}.`,
-      history_summary: taiXiuStats(totalsList)
-    };
+  if (patternMap[patternStr]) {
+    prediction = patternMap[patternStr] === "T" ? "Tài" : "Xỉu";
+    confidence = 95;
+    reason = `Khớp mẫu: ${patternStr} ➜ ${patternMap[patternStr]}`;
   }
 
   return {
-    prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-    confidence: 71,
-    reason: "Không có cầu đặc biệt, bẻ cầu mặc định.",
+    prediction,
+    confidence,
+    reason,
     history_summary: taiXiuStats(totalsList)
   };
 }
@@ -188,13 +161,14 @@ fastify.get("/api/hahasunvip", async (request, reply) => {
   }
 
   const totals = validResults.map(item => item.d1 + item.d2 + item.d3);
-  const predictionData = duDoanSunwin200kVip(totals);
+  const predictionData = duDoanTheoPattern(totals);
 
   const current = validResults[0];
   const total = current.d1 + current.d2 + current.d3;
   const currentResult = getTaiXiu(total);
   const currentSession = current.sid;
 
+  // Lấy đúng 13 phiên gần nhất làm pattern
   const pattern = validResults
     .slice(0, 13)
     .map(item => getTaiXiu(item.d1 + item.d2 + item.d3)[0])
