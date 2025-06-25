@@ -78,7 +78,126 @@ function getTaiXiu(total) {
   return total >= 11 ? "Tài" : "Xỉu";
 }
 
+
+const { Counter } = require("collections");
+
+function taiXiuStats(totalsList) {
+  const types = totalsList.map(getTaiXiu);
+  const count = types.reduce((acc, t) => {
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+  const totalCount = totalsList.reduce((acc, t) => {
+    acc[t] = (acc[t] || 0) + 1;
+    return acc;
+  }, {});
+  const sortedTotals = Object.entries(totalCount).sort((a, b) => b[1] - a[1]);
+  return {
+    tai_count: count["Tài"] || 0,
+    xiu_count: count["Xỉu"] || 0,
+    most_common_total: parseInt(sortedTotals[0][0]),
+    most_common_type: (count["Tài"] || 0) >= (count["Xỉu"] || 0) ? "Tài" : "Xỉu"
+  };
+}
+
 function duDoanSunwin200kVip(totalsList) {
+  if (totalsList.length < 4) {
+    return {
+      prediction: "Chờ",
+      confidence: 0,
+      reason: "Chưa đủ dữ liệu, cần ít nhất 4 phiên.",
+      history_summary: taiXiuStats(totalsList)
+    };
+  }
+
+  const last_4 = totalsList.slice(-4);
+  const last_3 = totalsList.slice(-3);
+  const last_6 = totalsList.slice(-6);
+  const last_total = totalsList[totalsList.length - 1];
+  const last_result = getTaiXiu(last_total);
+
+  function rule_special_pattern() {
+    if (last_4[0] === last_4[2] && last_4[0] === last_4[3] && last_4[0] !== last_4[1]) {
+      return {
+        prediction: "Tài",
+        confidence: 85,
+        reason: `Cầu đặc biệt ${last_4}. Bắt Tài theo công thức đặc biệt.`
+      };
+    }
+  }
+
+  function rule_sandwich() {
+    if (last_3[0] === last_3[2] && last_3[0] !== last_3[1]) {
+      return {
+        prediction: last_result === "Tài" ? "Xỉu" : "Tài",
+        confidence: 83,
+        reason: `Cầu sandwich ${last_3}. Bẻ cầu!`
+      };
+    }
+  }
+
+  function rule_special_numbers() {
+    const special_nums = [7, 9, 10];
+    const count = last_3.filter(t => special_nums.includes(t)).length;
+    if (count >= 2) {
+      return {
+        prediction: last_result === "Tài" ? "Xỉu" : "Tài",
+        confidence: 81,
+        reason: `Xuất hiện ≥2 số đặc biệt ${special_nums.join(",")} gần nhất. Bẻ cầu!`
+      };
+    }
+  }
+
+  function rule_frequent_repeat() {
+    const freq = last_6.filter(t => t === last_total).length;
+    if (freq >= 3) {
+      return {
+        prediction: getTaiXiu(last_total),
+        confidence: 80,
+        reason: `Số ${last_total} lặp lại ${freq} lần. Bắt theo nghiêng cầu!`
+      };
+    }
+  }
+
+  function rule_repeat_pattern() {
+    if (last_3[0] === last_3[2] || last_3[1] === last_3[2]) {
+      return {
+        prediction: last_result === "Tài" ? "Xỉu" : "Tài",
+        confidence: 77,
+        reason: `Cầu lặp dạng ${last_3}. Bẻ cầu theo dạng A-B-B hoặc A-B-A.`
+      };
+    }
+  }
+
+  function rule_default() {
+    return {
+      prediction: last_result === "Tài" ? "Xỉu" : "Tài",
+      confidence: 71,
+      reason: "Không có cầu đặc biệt nào, bẻ cầu mặc định theo 1-1."
+    };
+  }
+
+  const rules = [
+    rule_special_pattern,
+    rule_sandwich,
+    rule_special_numbers,
+    rule_frequent_repeat,
+    rule_repeat_pattern
+  ];
+
+  for (const rule of rules) {
+    const result = rule();
+    if (result) {
+      result.history_summary = taiXiuStats(totalsList);
+      return result;
+    }
+  }
+
+  const result = rule_default();
+  result.history_summary = taiXiuStats(totalsList);
+  return result;
+}
+
   if (totalsList.length < 4) {
     return {
       prediction: "Chờ",
