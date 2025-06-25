@@ -79,8 +79,6 @@ function getTaiXiu(total) {
 }
 
 
-const { Counter } = require("collections");
-
 function taiXiuStats(totalsList) {
   const types = totalsList.map(getTaiXiu);
   const count = types.reduce((acc, t) => {
