@@ -99,6 +99,43 @@ function taiXiuStats(totalsList) {
   };
 }
 
+
+
+// ========== CẦU VIP MỚI ==========
+
+// Helper: chuyển danh sách tổng thành chuỗi T/X
+function getTXPattern(list) {
+  return list.map(getTaiXiu).map(tx => tx[0]);
+}
+
+function matchCau121(pattern) {
+  const len = pattern.length;
+  if (len < 4) return null;
+  const [a, b, c] = pattern.slice(-4, -1);
+  if (a === 'T' && b === 'X' && c === 'X') return { prediction: "Tài", confidence: 89, reason: "Cầu 1-2-1 (T-X-X)" };
+  if (a === 'X' && b === 'T' && c === 'T') return { prediction: "Xỉu", confidence: 89, reason: "Cầu 1-2-1 (X-T-T)" };
+  return null;
+}
+
+function matchCau321(pattern) {
+  const len = pattern.length;
+  if (len < 6) return null;
+  const p = pattern.slice(-6);
+  if (p.join("") === "TTTXXT") return { prediction: "Xỉu", confidence: 90, reason: "Cầu 3-2-1 (T-T-T-X-X-T)" };
+  if (p.join("") === "XXXTTX") return { prediction: "Tài", confidence: 90, reason: "Cầu 3-2-1 (X-X-X-T-T-X)" };
+  return null;
+}
+
+function matchCau123(pattern) {
+  const len = pattern.length;
+  if (len < 6) return null;
+  const p = pattern.slice(-6);
+  if (p.join("") === "TXXT" && pattern.slice(-6, -5)[0] === "T") return { prediction: "Tài", confidence: 92, reason: "Cầu 1-2-3 (T-X-X-T-T-T)" };
+  if (p.join("") === "XTTX" && pattern.slice(-6, -5)[0] === "X") return { prediction: "Xỉu", confidence: 92, reason: "Cầu 1-2-3 (X-T-T-X-X-X)" };
+  return null;
+}
+
+
 function duDoanSunwinVipPro(totalsList) {
   if (totalsList.length < 10) {
     return {
