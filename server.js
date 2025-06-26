@@ -78,75 +78,96 @@ function getTaiXiu(total) {
   return total >= 11 ? "Tài" : "Xỉu";
 }
 
-function markovWeightedV3(pattern) {
-  if (pattern.length < 2) return null;
-  const last = pattern[pattern.length - 1];
-  const pairs = {};
-  for (let i = 0; i < pattern.length - 1; i++) {
-    const a = pattern[i], b = pattern[i + 1];
-    const key = a;
-    if (!pairs[key]) pairs[key] = { T: 0, X: 0 };
-    pairs[key][b]++;
-  }
-  const next = pairs[last];
-  if (!next) return null;
-  return next.T > next.X ? "Tài" : "Xỉu";
+function taiXiuStats(totalsList) {
+  const types = totalsList.map(getTaiXiu);
+  const count = {};
+  types.forEach(t => count[t] = (count[t] || 0) + 1);
+
+  const totalCount = {};
+  totalsList.forEach(t => totalCount[t] = (totalCount[t] || 0) + 1);
+
+  const sortedTotals = Object.entries(totalCount).sort((a, b) => b[1] - a[1]);
+  const mostCommonTotal = parseInt(sortedTotals[0][0]);
+  const mostCommonType = (count["Tài"] || 0) >= (count["Xỉu"] || 0) ? "Tài" : "Xỉu";
+
+  return {
+    tai_count: count["Tài"] || 0,
+    xiu_count: count["Xỉu"] || 0,
+    most_common_total: mostCommonTotal,
+    most_common_type: mostCommonType
+  };
 }
 
-function repeatingPatternV3(pattern) {
-  if (pattern.length < 4) return null;
-  const last = pattern.slice(-2).join("");
-  for (let i = pattern.length - 4; i >= 0; i--) {
-    if (pattern[i] === last[0] && pattern[i + 1] === last[1]) {
-      return last[0] === "T" ? "Tài" : "Xỉu";
-    }
-  }
-  return null;
-}
-
-function detectBiasV3(pattern) {
-  const t = pattern.filter(p => p === "T").length;
-  const x = pattern.filter(p => p === "X").length;
-  if (Math.abs(t - x) >= 3) return t > x ? "Tài" : "Xỉu";
-  return null;
-}
-
-function multiWindowV3(patternArr, windows = [5, 10, 20, 30, 50]) {
-  const voteCounts = { Tài: 0, Xỉu: 0 };
-  let totalWeight = 0;
-
-  for (const win of windows) {
-    if (patternArr.length < win) continue;
-
-    const subPattern = patternArr.slice(-win);
-    const markovRes = markovWeightedV3(subPattern);
-    const repeatRes = repeatingPatternV3(subPattern);
-    const biasRes = detectBiasV3(subPattern);
-    const weight = win;
-
-    if (markovRes) voteCounts[markovRes] += weight * 0.7;
-    if (repeatRes) voteCounts[repeatRes] += weight * 0.15;
-    if (biasRes) voteCounts[biasRes] += weight * 0.15;
-
-    totalWeight += weight;
+function duDoanSunwin200kVip(totalsList) {
+  if (totalsList.length < 4) {
+    return {
+      prediction: "Chờ",
+      confidence: 0,
+      reason: "Chưa đủ dữ liệu.",
+      history_summary: taiXiuStats(totalsList)
+    };
   }
 
-  let finalPredict = null;
-  let confidence = 50;
+  const last4 = totalsList.slice(-4);
+  const last3 = totalsList.slice(-3);
+  const last6 = totalsList.slice(-6);
+  const lastTotal = totalsList[totalsList.length - 1];
+  const lastResult = getTaiXiu(lastTotal);
 
-  if (voteCounts.Tài > voteCounts.Xỉu) {
-    finalPredict = "Tài";
-    confidence = Math.min(99, Math.round((voteCounts.Tài / (voteCounts.Tài + voteCounts.Xỉu)) * 100));
-  } else if (voteCounts.Xỉu > voteCounts.Tài) {
-    finalPredict = "Xỉu";
-    confidence = Math.min(99, Math.round((voteCounts.Xỉu / (voteCounts.Tài + voteCounts.Xỉu)) * 100));
-  } else {
-    const last = patternArr[patternArr.length - 1];
-    finalPredict = last === "T" ? "Xỉu" : "Tài";
-    confidence = 50;
+  if (last4[0] === last4[2] && last4[0] === last4[3] && last4[0] !== last4[1]) {
+    return {
+      prediction: "Tài",
+      confidence: 85,
+      reason: `Cầu đặc biệt ${last4}. Bắt Tài.`,
+      history_summary: taiXiuStats(totalsList)
+    };
   }
 
-  return { prediction: finalPredict, confidence };
+  if (last3[0] === last3[2] && last3[0] !== last3[1]) {
+    return {
+      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
+      confidence: 83,
+      reason: `Cầu sandwich ${last3}.`,
+      history_summary: taiXiuStats(totalsList)
+    };
+  }
+
+  const specialNums = [7, 9, 10];
+  const count = last3.filter(t => specialNums.includes(t)).length;
+  if (count >= 2) {
+    return {
+      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
+      confidence: 81,
+      reason: `Xuất hiện nhiều số đặc biệt (${specialNums.join(",")}) gần đây.`,
+      history_summary: taiXiuStats(totalsList)
+    };
+  }
+
+  const freq = last6.filter(t => t === lastTotal).length;
+  if (freq >= 3) {
+    return {
+      prediction: getTaiXiu(lastTotal),
+      confidence: 80,
+      reason: `Số ${lastTotal} lặp lại ${freq} lần.`,
+      history_summary: taiXiuStats(totalsList)
+    };
+  }
+
+  if (last3[0] === last3[2] || last3[1] === last3[2]) {
+    return {
+      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
+      confidence: 77,
+      reason: `Cầu lặp lại ${last3}.`,
+      history_summary: taiXiuStats(totalsList)
+    };
+  }
+
+  return {
+    prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
+    confidence: 71,
+    reason: "Không có cầu đặc biệt, bẻ cầu mặc định.",
+    history_summary: taiXiuStats(totalsList)
+  };
 }
 
 fastify.get("/api/hahasunvip", async (request, reply) => {
@@ -154,7 +175,7 @@ fastify.get("/api/hahasunvip", async (request, reply) => {
     .reverse()
     .filter(item => item.d1 && item.d2 && item.d3);
 
-  if (validResults.length < 13) {
+  if (validResults.length < 1) {
     return {
       current_result: null,
       current_session: null,
@@ -166,27 +187,33 @@ fastify.get("/api/hahasunvip", async (request, reply) => {
     };
   }
 
+  const totals = validResults.map(item => item.d1 + item.d2 + item.d3);
+  const predictionData = duDoanSunwin200kVip(totals);
+
   const current = validResults[0];
   const total = current.d1 + current.d2 + current.d3;
   const currentResult = getTaiXiu(total);
   const currentSession = current.sid;
 
   const pattern = validResults
-    .slice(0, 50)
+    .slice(0, 13)
     .map(item => getTaiXiu(item.d1 + item.d2 + item.d3)[0])
-    .reverse();
+    .reverse()
+    .join("");
 
-  const result = multiWindowV3(pattern);
+  const count = pattern.split("").filter(p => p === predictionData.prediction[0]).length;
+  const doTinCay = Math.round((count / (pattern.length - 1)) * 100);
 
   return {
     current_result: currentResult,
     current_session: currentSession,
     phien_hien_tai: currentSession + 1,
-    du_doan: result.prediction,
-    do_tin_cay: result.confidence + "%",
-    used_pattern: pattern.join(""),
+    du_doan: predictionData.prediction,
+    do_tin_cay: doTinCay + "%",
+    used_pattern: pattern,
     xuc_xac: [current.d1, current.d2, current.d3],
-    reason: "Theo phân tích nhiều cửa sổ dữ liệu."
+    reason: predictionData.reason,
+    thong_ke: predictionData.history_summary
   };
 });
 
