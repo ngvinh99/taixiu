@@ -16,14 +16,14 @@ const PORT = process.env.PORT || 3000;
 fastify.register(fastifyWebsocket);
 
 // --- Cấu hình API Key và Auth cho WebSocket ---
-const API_KEY = "tuantusunwin"; // Thay đổi key này bằng key của bạn
+const API_KEY = "axosunvip"; // Thay đổi key này bằng key của bạn
 
 // Middleware for HTTP API (still keeping it for now, can be removed)
 fastify.addHook("onRequest", async (request, reply) => {
   if (request.url.startsWith("/api/sunwin") || request.url.startsWith("/api/history-json")) {
     const urlKey = request.query.key;
     if (!urlKey || urlKey !== API_KEY) {
-      return reply.code(403).send({ error: "Key sai mẹ rồi, liên hệ tele: @Phuonglinhtaixiu" });
+      return reply.code(403).send({ error: "Key sai con mẹ nó rồi, liên hệ tele: @axobantool" });
     }
   }
 });
@@ -280,7 +280,7 @@ async function broadcastPrediction() {
                 "do_tin_cay": "0.00%",
                 "cau": "Chưa đủ dữ liệu",
                 "ngay": currentTimestamp,
-                "Id": "tuantu"
+                "Id": "@axobantool"
             };
             connectedClients.forEach(clientWs => {
                 if (clientWs.readyState === WebSocket.OPEN) {
@@ -494,7 +494,7 @@ async function broadcastPrediction() {
             "do_tin_cay": `${overallConfidence}%`,
             "cau": detectedPatternString,
             "ngay": currentTimestamp,
-            "Id": "tuantu"
+            "Id": "@axobantool"
         };
 
         // Broadcast to all connected WebSocket clients
@@ -2147,7 +2147,7 @@ fastify.get("/api/sunwin", async (request, reply) => {
           "do_tin_cay": "0.00%",
           "cau": "Chưa đủ dữ liệu",
           "ngay": currentTimestamp,
-          "Id": "tuantu"
+          "Id": "@axobantool"
         });
         return resolve();
       }
@@ -2306,7 +2306,7 @@ fastify.get("/api/sunwin", async (request, reply) => {
         "do_tin_cay": `${overallConfidence}%`,
         "cau": detectedPatternString,
         "ngay": currentTimestamp,
-        "Id": "tuantu"
+        "Id": "@axobantool"
       });
       resolve();
     });
