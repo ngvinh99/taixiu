@@ -1,5 +1,6 @@
 const Fastify = require("fastify");
 const WebSocket = require("ws");
+const axios = require("axios");
 
 const fastify = Fastify({ logger: false });
 const PORT = process.env.PORT || 3000;
@@ -57,7 +58,9 @@ function connectWebSocket() {
         currentResult = getTaiXiu(total);
         currentSession = latest.sid;
       }
-    } catch (e) {}
+    } catch (e) {
+      console.error("❌ JSON parse error:", e.message);
+    }
   });
 
   ws.on("close", () => {
@@ -98,78 +101,33 @@ function taiXiuStats(totalsList) {
   };
 }
 
-function duDoanSunwin200kVip(totalsList) {
-  if (totalsList.length < 4) {
+// ✅ Hàm gọi AI API để dự đoán Tài/Xỉu
+async function duDoanBangAI(totalsList) {
+  try {
+    const response = await axios.post("https://api.tai-xiu-ai.com/predict", {
+      history: totalsList
+    });
+
+    const { prediction, confidence, reason } = response.data;
+
+    return {
+      prediction,
+      confidence,
+      reason,
+      history_summary: taiXiuStats(totalsList)
+    };
+  } catch (error) {
+    console.error("❌ AI prediction error:", error.message);
     return {
       prediction: "Chờ",
       confidence: 0,
-      reason: "Chưa đủ dữ liệu.",
+      reason: "Không thể kết nối AI.",
       history_summary: taiXiuStats(totalsList)
     };
   }
-
-  const last4 = totalsList.slice(-4);
-  const last3 = totalsList.slice(-3);
-  const last6 = totalsList.slice(-6);
-  const lastTotal = totalsList[totalsList.length - 1];
-  const lastResult = getTaiXiu(lastTotal);
-
-  if (last4[0] === last4[2] && last4[0] === last4[3] && last4[0] !== last4[1]) {
-    return {
-      prediction: "Tài",
-      confidence: 85,
-      reason: `Cầu đặc biệt ${last4}. Bắt Tài.`,
-      history_summary: taiXiuStats(totalsList)
-    };
-  }
-
-  if (last3[0] === last3[2] && last3[0] !== last3[1]) {
-    return {
-      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-      confidence: 83,
-      reason: `Cầu sandwich ${last3}.`,
-      history_summary: taiXiuStats(totalsList)
-    };
-  }
-
-  const specialNums = [7, 9, 10];
-  const count = last3.filter(t => specialNums.includes(t)).length;
-  if (count >= 2) {
-    return {
-      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-      confidence: 81,
-      reason: `Xuất hiện nhiều số đặc biệt (${specialNums.join(",")}) gần đây.`,
-      history_summary: taiXiuStats(totalsList)
-    };
-  }
-
-  const freq = last6.filter(t => t === lastTotal).length;
-  if (freq >= 3) {
-    return {
-      prediction: getTaiXiu(lastTotal),
-      confidence: 80,
-      reason: `Số ${lastTotal} lặp lại ${freq} lần.`,
-      history_summary: taiXiuStats(totalsList)
-    };
-  }
-
-  if (last3[0] === last3[2] || last3[1] === last3[2]) {
-    return {
-      prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-      confidence: 77,
-      reason: `Cầu lặp lại ${last3}.`,
-      history_summary: taiXiuStats(totalsList)
-    };
-  }
-
-  return {
-    prediction: lastResult === "Tài" ? "Xỉu" : "Tài",
-    confidence: 71,
-    reason: "Không có cầu đặc biệt, bẻ cầu mặc định.",
-    history_summary: taiXiuStats(totalsList)
-  };
 }
 
+// ✅ API chính
 fastify.get("/api/hahasunvip", async (request, reply) => {
   const validResults = [...lastResults]
     .reverse()
@@ -188,7 +146,7 @@ fastify.get("/api/hahasunvip", async (request, reply) => {
   }
 
   const totals = validResults.map(item => item.d1 + item.d2 + item.d3);
-  const predictionData = duDoanSunwin200kVip(totals);
+  const predictionData = await duDoanBangAI(totals);
 
   const current = validResults[0];
   const total = current.d1 + current.d2 + current.d3;
@@ -228,4 +186,3 @@ const start = async () => {
 };
 
 start();
-  
