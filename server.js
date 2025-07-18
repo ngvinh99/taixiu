@@ -102,7 +102,7 @@ function connectWebSocket() {
           const du_doan = duDoanTiepTheo(patternHistory);
 
           currentData = {
-            id: "binhtool90",
+            id: "bố làm đc rồi a xó",
             id_phien: id_phien_chua_co_kq,
             ket_qua: text,
             pattern: patternHistory.join(''),
