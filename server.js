@@ -111,7 +111,7 @@ function duDoanSunwin200kVIP(totals) {
 }
 
 function connectWebSocket() {
-  ws = new WebSocket("wss://websocket.azhkthg1.net/websocket?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhbW91bnQiOjAsInVzZXJuYW1lIjoiU0NfYXhvZGF5In0.DMD395i2WINL3cAb8YjfVcYaod9ltA2XiH8CY35vv8s");
+  ws = new WebSocket("wss://websocket.azhkthg1.net/wsbinary?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhbW91bnQiOjAsImdlbmRlciI6MCwiZGlzcGxheU5hbWUiOiJ4b3NpZXVkZXAiLCJwaG9uZVZlcmlmaWVkIjp0cnVlLCJib3QiOjAsImF2YXRhciI6Imh0dHBzOi8vaW1hZ2VzLnN3aW5zaG9wLm5ldC9pbWFnZXMvYXZhdGFyL2F2YXRhcl8wMi5wbmciLCJ1c2VySWQiOiI2YzJjMjMyYy02OTJiLTQ1NTktOGZiMS1kOTQ0NWUwMmU5ODQiLCJyZWdUaW1lIjoxNzUxMzU2NjYwOTkzLCJwaG9uZSI6Ijg0OTE0NzkxOTc4IiwiY3VzdG9tZXJJZCI6MjczNTM1Nzk3LCJicmFuZCI6InN1bi53aW4iLCJ1c2VybmFtZSI6IlNDX2F4b2RheSIsInRpbWVzdGFtcCI6MTc1MjgxNjMwNjUxNn0.gZkznc-YyY_p12H_jlTgfh-yIA4YvliABLRRDu2v5Go");
 
   ws.on("open", () => {
     console.log("✅ Kết nối WebSocket thành công");
