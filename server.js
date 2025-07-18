@@ -168,7 +168,7 @@ connectRikWebSocket();
 
 fastify.register(cors);
 
-fastify.get("/api/taixiu/sunwin", async () => {
+fastify.get("/axobantol", async () => {
   const validResults = rikResults.filter(item => item.d1 && item.d2 && item.d3);
 
   if (validResults.length === 0) {
