@@ -270,9 +270,9 @@ const PATTERN_MAP = {
 function getDuDoanFromPattern(pattern) {
   const keys = Object.keys(PATTERN_MAP).sort((a, b) => b.length - a.length);
   for (const key of keys) {
-    if (pattern.endsWith(key)) return PATTERN_MAP[key];
+    if (pattern.endsWith(key)) return { du_doan: PATTERN_MAP[key], khop_pattern: key };
   }
-  return "?";
+  return { du_doan: "?", khop_pattern: null };
 }
 
 function getTX(d1, d2, d3) {
@@ -411,7 +411,7 @@ fastify.get("/axobantol", async () => {
     .map(r => (r.d1 + r.d2 + r.d3 >= 11 ? "t" : "x"))
     .join("");
 
-  const duDoan = getDuDoanFromPattern(duongCau.toUpperCase());
+  const { du_doan, khop_pattern } = getDuDoanFromPattern(duongCau.toUpperCase());
 
   return {
     id: "@axobantool",
@@ -420,7 +420,8 @@ fastify.get("/axobantol", async () => {
     xuc_xac: `${current.d1},${current.d2},${current.d3}`,
     phien_moi: current.sid + 1,
     pattern: duongCau,
-    du_doan: duDoan
+    khop_pattern,
+    du_doan
   };
 });
 
