@@ -1,23 +1,17 @@
 {
-  "name": "sunwin-pattern-api",
+  "name": "taixiu-server",
   "version": "1.0.0",
-  "description": "API dự đoán Tài/Xỉu SunWin từ dữ liệu ngoài",
+  "description": "WebSocket + API Tài Xỉu SunWin",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": [
-    "sunwin",
-    "taixiu",
-    "fastify",
-    "axios",
-    "pattern"
-  ],
-  "author": "axobantool",
+  "keywords": ["taixiu", "sunwin", "websocket", "api"],
+  "author": "ngvinh99",
   "license": "MIT",
   "dependencies": {
-    "axios": "^1.6.8",
-    "fastify": "^4.22.2",
-    "@fastify/cors": "^8.2.1"
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "ws": "^8.13.0"
   }
 }
