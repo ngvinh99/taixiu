@@ -145,7 +145,7 @@ function connectWebSocket() {
 }
 
 // === API ===
-app.get('/axobantool', (req, res) => {
+app.get('/axobantol', (req, res) => {
   res.json(currentData);
 });
 
