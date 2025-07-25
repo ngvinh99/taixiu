@@ -2,79 +2,77 @@ const Fastify = require("fastify");
 const cors = require("@fastify/cors");
 const axios = require("axios");
 
-const fastify = Fastify({ logger: false });
+const fastify = Fastify();
 const PORT = process.env.PORT || 3001;
 
 let rikResults = [];
 
 const PATTERN_MAP = {
-  "txt": "Tài",
-  "ttxx": "Tài",
-  "xttx": "Xỉu",
-  "ttx": "Xỉu",
-  "xxt": "Tài",
-  "t": "Xỉu"
+  "TXT": "Xỉu",
+  "TTXX": "Tài",
+  "XXTXX": "Tài",
+  "TTX": "Xỉu",
+  "XTT": "Tài",
+  "TXX": "Tài"
 };
 
-// Hàm khớp pattern từ cuối pattern cũ đến mới
 function getDuDoanFromPattern(pattern) {
   const keys = Object.keys(PATTERN_MAP).sort((a, b) => b.length - a.length);
   for (const key of keys) {
-    if (pattern.endsWith(key.toLowerCase())) {
-      return { du_doan: PATTERN_MAP[key], khop_pattern: key.toLowerCase() };
+    if (pattern.endsWith(key)) {
+      return { du_doan: PATTERN_MAP[key], khop_pattern: key };
     }
   }
   return { du_doan: "?", khop_pattern: null };
 }
 
-// Hàm phân loại Tài/Xỉu theo tổng 3 viên xúc xắc
 function getTX(d1, d2, d3) {
   const sum = d1 + d2 + d3;
-  return sum >= 11 ? "t" : "x";
+  return sum >= 11 ? "T" : "X";
 }
 
-// Lấy dữ liệu từ API bên ngoài mỗi 5 giây
+// Lấy dữ liệu từ API mỗi 5 giây
 async function fetchData() {
   try {
     const res = await axios.get("https://apigame-wy0p.onrender.com/api/sunwin");
     const data = res.data;
 
-    if (data?.sid && data?.d1 && data?.d2 && data?.d3) {
-      const existing = rikResults.find(r => r.sid === data.sid);
-      if (!existing) {
-        rikResults.push({
-          sid: data.sid,
-          d1: data.d1,
-          d2: data.d2,
-          d3: data.d3
+    if (data && data.xuc_xac1 && data.xuc_xac2 && data.xuc_xac3 && data.phien) {
+      const exists = rikResults.find(item => item.sid === data.phien);
+      if (!exists) {
+        rikResults.unshift({
+          sid: data.phien,
+          d1: data.xuc_xac1,
+          d2: data.xuc_xac2,
+          d3: data.xuc_xac3
         });
 
-        if (rikResults.length > 50) rikResults.shift(); // giữ max 50 phiên
+        if (rikResults.length > 50) rikResults.pop();
+        console.log(`✅ Phiên ${data.phien} đã được thêm.`);
       }
+    } else {
+      console.warn("⚠️ Dữ liệu không hợp lệ:", data);
     }
   } catch (err) {
-    console.error("Lỗi fetch dữ liệu:", err.message);
+    console.error("❌ Lỗi lấy dữ liệu:", err.message);
   }
 }
 
-// Gọi ban đầu và lặp lại
 fetchData();
 setInterval(fetchData, 5000);
 
 // Đăng ký CORS
 fastify.register(cors);
 
-// API dự đoán
+// API pattern dự đoán
 fastify.get("/axobantol", async () => {
-  const validResults = rikResults.filter(item => item.d1 && item.d2 && item.d3);
-  if (validResults.length < 5) return { message: "Không đủ dữ liệu." };
+  const validResults = rikResults.filter(r => r.d1 && r.d2 && r.d3);
+  if (validResults.length === 0) return { message: "Không đủ dữ liệu." };
 
-  const current = validResults[validResults.length - 1]; // phiên mới nhất
-  const sumCurrent = current.d1 + current.d2 + current.d3;
-  const ketQuaCurrent = sumCurrent >= 11 ? "Tài" : "Xỉu";
-
+  const current = validResults[0];
   const pattern = validResults
-    .slice(-13) // 13 phiên gần nhất, theo thời gian cũ → mới
+    .slice()
+    .reverse()
     .map(r => getTX(r.d1, r.d2, r.d3))
     .join("");
 
@@ -83,10 +81,10 @@ fastify.get("/axobantol", async () => {
   return {
     id: "@axobantool",
     phien_cu: current.sid,
-    ket_qua: ketQuaCurrent,
+    ket_qua: getTX(current.d1, current.d2, current.d3) === "T" ? "Tài" : "Xỉu",
     xuc_xac: `${current.d1},${current.d2},${current.d3}`,
     phien_moi: current.sid + 1,
-    pattern,
+    pattern,  // từ cũ đến mới
     khop_pattern,
     du_doan
   };
@@ -95,10 +93,10 @@ fastify.get("/axobantol", async () => {
 // Start server
 const start = async () => {
   try {
-    const address = await fastify.listen({ port: PORT, host: "0.0.0.0" });
-    console.log(`🚀 Server chạy tại ${address}`);
+    await fastify.listen({ port: PORT, host: "0.0.0.0" });
+    console.log(`🚀 Server chạy tại http://localhost:${PORT}`);
   } catch (err) {
-    console.error("❌ Server lỗi:", err);
+    console.error("❌ Lỗi khởi chạy:", err);
     process.exit(1);
   }
 };
