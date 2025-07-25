@@ -30,11 +30,30 @@ async function fetchData() {
     const res = await axios.get("https://apigame-wy0p.onrender.com/api/sunwin");
     const data = res.data;
 
-    if (Array.isArray(data) && data.length > 0) {
-      rikResults = data;
+    // Kiểm tra nếu dữ liệu hợp lệ
+    if (
+      data &&
+      typeof data.phien === "number" &&
+      typeof data.xuc_xac1 === "number" &&
+      typeof data.xuc_xac2 === "number" &&
+      typeof data.xuc_xac3 === "number"
+    ) {
+      const newResult = {
+        sid: data.phien,
+        d1: data.xuc_xac1,
+        d2: data.xuc_xac2,
+        d3: data.xuc_xac3,
+      };
+
+      // Nếu chưa có trong danh sách thì thêm vào đầu
+      if (!rikResults.some(item => item.sid === newResult.sid)) {
+        rikResults.unshift(newResult);
+        if (rikResults.length > 50) rikResults.pop(); // Giữ 50 dòng
+        console.log(`Đã thêm phiên ${newResult.sid}`);
+      }
     }
-  } catch (err) {
-    console.error("Lỗi khi fetch dữ liệu:", err.message);
+  } catch (error) {
+    console.error("Lỗi fetchData:", error.message);
   }
 }
 
