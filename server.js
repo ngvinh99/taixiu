@@ -1,9 +1,11 @@
 const Fastify = require("fastify");
-const cors = require("@fastify/cors");
 const axios = require("axios");
+const cors = require("@fastify/cors");
 
-const fastify = Fastify();
-const PORT = process.env.PORT || 3001;
+const fastify = Fastify({ logger: false });
+fastify.register(cors);
+
+const PORT = process.env.PORT || 3000;
 
 let rikResults = [];
 
@@ -13,14 +15,17 @@ const PATTERN_MAP = {
   "XXTXX": "Tài",
   "TTX": "Xỉu",
   "XTT": "Tài",
-  "TXX": "Tài"
+  "TXX": "Tài",
 };
 
 function getDuDoanFromPattern(pattern) {
   const keys = Object.keys(PATTERN_MAP).sort((a, b) => b.length - a.length);
   for (const key of keys) {
     if (pattern.endsWith(key)) {
-      return { du_doan: PATTERN_MAP[key], khop_pattern: key };
+      return {
+        du_doan: PATTERN_MAP[key],
+        khop_pattern: key,
+      };
     }
   }
   return { du_doan: "?", khop_pattern: null };
@@ -31,72 +36,59 @@ function getTX(d1, d2, d3) {
   return sum >= 11 ? "T" : "X";
 }
 
-// Lấy dữ liệu từ API mỗi 5 giây
 async function fetchData() {
   try {
     const res = await axios.get("https://apigame-wy0p.onrender.com/api/sunwin");
-    const data = res.data;
-
-    if (data && data.xuc_xac1 && data.xuc_xac2 && data.xuc_xac3 && data.phien) {
-      const exists = rikResults.find(item => item.sid === data.phien);
-      if (!exists) {
-        rikResults.unshift({
-          sid: data.phien,
-          d1: data.xuc_xac1,
-          d2: data.xuc_xac2,
-          d3: data.xuc_xac3
-        });
-
-        if (rikResults.length > 50) rikResults.pop();
-        console.log(`✅ Phiên ${data.phien} đã được thêm.`);
-      }
-    } else {
-      console.warn("⚠️ Dữ liệu không hợp lệ:", data);
+    const item = res.data;
+    if (item && item.d1 && item.d2 && item.d3 && item.sid) {
+      const tx = getTX(item.d1, item.d2, item.d3);
+      rikResults.unshift({
+        sid: item.sid,
+        d1: item.d1,
+        d2: item.d2,
+        d3: item.d3,
+        tx,
+      });
+      // Giữ tối đa 50 kết quả
+      rikResults = rikResults.slice(0, 50);
     }
   } catch (err) {
-    console.error("❌ Lỗi lấy dữ liệu:", err.message);
+    console.error("❌ Lỗi fetch:", err.message);
   }
 }
 
-fetchData();
 setInterval(fetchData, 5000);
+fetchData();
 
-// Đăng ký CORS
-fastify.register(cors);
-
-// API pattern dự đoán
-fastify.get("/axobantol", async () => {
+fastify.get("/dudoan", async () => {
   const validResults = rikResults.filter(r => r.d1 && r.d2 && r.d3);
-  if (validResults.length === 0) return { message: "Không đủ dữ liệu." };
+  if (validResults.length < 14) {
+    return { message: "Không đủ dữ liệu." };
+  }
 
   const current = validResults[0];
-  const pattern = validResults
-    .slice()
-    .reverse()
-    .map(r => getTX(r.d1, r.d2, r.d3))
-    .join("");
+  const pattern = validResults.slice(1, 14).reverse().map(r => r.tx).join("");
 
   const { du_doan, khop_pattern } = getDuDoanFromPattern(pattern);
 
   return {
     id: "@axobantool",
     phien_cu: current.sid,
-    ket_qua: getTX(current.d1, current.d2, current.d3) === "T" ? "Tài" : "Xỉu",
+    ket_qua: current.tx === "T" ? "Tài" : "Xỉu",
     xuc_xac: `${current.d1},${current.d2},${current.d3}`,
     phien_moi: current.sid + 1,
-    pattern,  // từ cũ đến mới
+    pattern,
     khop_pattern,
-    du_doan
+    du_doan,
   };
 });
 
-// Start server
 const start = async () => {
   try {
     await fastify.listen({ port: PORT, host: "0.0.0.0" });
     console.log(`🚀 Server chạy tại http://localhost:${PORT}`);
   } catch (err) {
-    console.error("❌ Lỗi khởi chạy:", err);
+    console.error("❌ Lỗi server:", err);
     process.exit(1);
   }
 };
