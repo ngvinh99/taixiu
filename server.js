@@ -281,7 +281,13 @@ async function fetchData() {
     const res = await axios.get("https://apigame-wy0p.onrender.com/api/sunwin");
     const data = res.data;
 
-    
+    if (Array.isArray(data)) {
+      rikResults = data.sort((a, b) => b.sid - a.sid); // Sắp xếp giảm dần theo sid
+    }
+  } catch (err) {
+    console.error("Lỗi fetch API:", err.message);
+  }
+}
 
 // Gọi ban đầu và lặp lại
 fetchData();
