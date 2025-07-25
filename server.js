@@ -309,33 +309,40 @@ setInterval(fetchData, 5000);
 fastify.register(cors);
 
 // API dự đoán
+let pattern = [];
+
 fastify.get("/axobantol", async () => {
-  const validResults = rikResults.filter(item => item.d1 && item.d2 && item.d3);
-  if (validResults.length < 1) return { message: "Không đủ dữ liệu." };
+  try {
+    const res = await fetch("https://apigame-wy0p.onrender.com/api/sunwin");
+    const data = await res.json();
 
-  const current = validResults[0];
+    if (!data || !data.ket_qua || !data.phien || !data.xuc_xac1 || !data.xuc_xac2 || !data.xuc_xac3) {
+      console.warn("❌ Dữ liệu API không hợp lệ:", data);
+      return { message: "Không đủ dữ liệu." };
+    }
 
-  const sumCurrent = current.d1 + current.d2 + current.d3;
-  const ketQuaCurrent = sumCurrent >= 11 ? "Tài" : "Xỉu";
+    // Thêm kết quả mới vào pattern
+    const ketQua = data.ket_qua.toLowerCase() === "tài" ? "t" : "x";
+    pattern.push(ketQua);
+    if (pattern.length > 13) pattern.shift(); // Giữ tối đa 13 kết quả gần nhất
 
-  const duongCau = validResults
-    .slice(0, 13)
-    .reverse()
-    .map(r => (r.d1 + r.d2 + r.d3 >= 11 ? "t" : "x"))
-    .join("");
+    const patternStr = pattern.join("");
+    const { du_doan, khop_pattern } = getDuDoanFromPattern(patternStr.toUpperCase());
 
-  const { du_doan, khop_pattern } = getDuDoanFromPattern(duongCau.toUpperCase());
-
-  return {
-    id: "@axobantool",
-    phien_cu: current.sid,
-    ket_qua: ketQuaCurrent,
-    xuc_xac: `${current.d1},${current.d2},${current.d3}`,
-    phien_moi: current.sid + 1,
-    pattern: duongCau,
-    khop_pattern,
-    du_doan
-  };
+    return {
+      id: "@axobantool",
+      phien_cu: data.phien,
+      ket_qua: data.ket_qua,
+      xuc_xac: `${data.xuc_xac1},${data.xuc_xac2},${data.xuc_xac3}`,
+      phien_moi: data.phien + 1,
+      pattern: patternStr,
+      khop_pattern,
+      du_doan
+    };
+  } catch (err) {
+    console.error("❌ Lỗi API:", err);
+    return { message: "Lỗi khi gọi API." };
+  }
 });
 
 // Start server
