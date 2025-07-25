@@ -281,25 +281,7 @@ async function fetchData() {
     const res = await axios.get("https://apigame-wy0p.onrender.com/api/sunwin");
     const data = res.data;
 
-    if (Array.isArray(data)) {
-      rikResults = data
-        .filter(r => r.d1 && r.d2 && r.d3)
-        .map(r => ({
-          sid: r.sid,
-          d1: r.d1,
-          d2: r.d2,
-          d3: r.d3
-        }))
-        .sort((a, b) => b.sid - a.sid)
-        .slice(0, 50);
-      console.log("✅ Đã cập nhật dữ liệu mới.");
-    } else {
-      console.log("⚠️ Dữ liệu không hợp lệ:", data);
-    }
-  } catch (err) {
-    console.error("❌ Lỗi khi lấy dữ liệu API:", err.message);
-  }
-}
+    
 
 // Gọi ban đầu và lặp lại
 fetchData();
@@ -313,7 +295,18 @@ fastify.get("/axobantol", async () => {
   const validResults = rikResults.filter(item => item.d1 && item.d2 && item.d3);
   if (validResults.length < 1) return { message: "Không đủ dữ liệu." };
 
-  const current = validResults[0]; // phiên mới nhất
+  const current = validResults[0]; // phiên mới nhấif (data && data.xuc_xac1 && data.xuc_xac2 && data.xuc_xac3 && data.phien) {
+  rikResults.unshift({
+    sid: data.phien,
+    d1: data.xuc_xac1,
+    d2: data.xuc_xac2,
+    d3: data.xuc_xac3
+  });
+  if (rikResults.length > 50) rikResults.pop();
+  console.log(`✅ Dữ liệu OK: phiên ${data.phien}`);
+} else {
+  console.warn("⚠️ DỮ liệu không hợp lệ:", data);
+}
   const sumCurrent = current.d1 + current.d2 + current.d3;
   const ketQuaCurrent = sumCurrent >= 11 ? "Tài" : "Xỉu";
 
