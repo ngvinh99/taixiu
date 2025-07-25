@@ -1,17 +1,11 @@
-
 const Fastify = require("fastify");
 const cors = require("@fastify/cors");
-const WebSocket = require("ws");
-
-const TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJ4b3NpZXVkZXAiLCJib3QiOjAsImlzTWVyY2hhbnQiOmZhbHNlLCJ2ZXJpZmllZEJhbmtBY2NvdW50IjpmYWxzZSwicGxheUV2ZW50TG9iYnkiOmZhbHNlLCJjdXN0b21lcklkIjoyNzM1MzU3OTcsImFmZklkIjoiNmMyYzIzMmMtNjkyYi00NTU5LThmYjEtZDk0NDVlMDJlOTg0IiwiYmFubmVkIjpmYWxzZSwiYnJhbmQiOiJzdW4ud2luIiwidGltZXN0YW1wIjoxNzUzNDEwMTY1NDE2LCJsb2NrR2FtZXMiOltdLCJhbW91bnQiOjAsImxvY2tDaGF0IjpmYWxzZSwicGhvbmVWZXJpZmllZCI6dHJ1ZSwiaXBBZGRyZXNzIjoiMmEwOTpiYWM1OmQ0NmQ6MThiZTo6Mjc3OjlhIiwibXV0ZSI6ZmFsc2UsImF2YXRhciI6Imh0dHBzOi8vaW1hZ2VzLnN3aW5zaG9wLm5ldC9pbWFnZXMvYXZhdGFyL2F2YXRhcl8wMi5wbmciLCJwbGF0Zm9ybUlkIjo1LCJ1c2VySWQiOiI2YzJjMjMyYy02OTJiLTQ1NTktOGZiMS1kOTQ0NWUwMmU5ODQiLCJyZWdUaW1lIjoxNzUxMzU2NjYwOTkzLCJwaG9uZSI6Ijg0OTE0NzkxOTc4IiwiZGVwb3NpdCI6dHJ1ZSwidXNlcm5hbWUiOiJTQ19heG9kYXkifQ.2Ae24grIZHookLXR1JlR9bcxiHQ8WZ-9UGsWD8hDjQM";
+const axios = require("axios");
 
 const fastify = Fastify({ logger: false });
 const PORT = process.env.PORT || 3001;
 
 let rikResults = [];
-let rikCurrentSession = null;
-let rikWS = null;
-let rikIntervalCmd = null;
 
 const PATTERN_MAP = {
   "TXT": "Xỉu", 
@@ -281,128 +275,45 @@ function getTX(d1, d2, d3) {
   return sum >= 11 ? "T" : "X";
 }
 
-function sendRikCmd1005() {
-  if (rikWS && rikWS.readyState === WebSocket.OPEN) {
-    const payload = [6, "MiniGame", "taixiuPlugin", { cmd: 1005 }];
-    rikWS.send(JSON.stringify(payload));
-  }
-}
-
-function decodeBinaryMessage(buffer) {
+// Lấy dữ liệu từ API bên ngoài mỗi 5 giây
+async function fetchData() {
   try {
-    const str = buffer.toString();
-    if (str.startsWith("[")) return JSON.parse(str);
+    const res = await axios.get("https://apigame-wy0p.onrender.com/api/sunwin");
+    const data = res.data;
 
-    let position = 0;
-    const result = [];
-
-    while (position < buffer.length) {
-      const type = buffer.readUInt8(position++);
-      if (type === 1) {
-        const length = buffer.readUInt16BE(position);
-        position += 2;
-        const str = buffer.toString("utf8", position, position + length);
-        position += length;
-        result.push(str);
-      } else if (type === 2) {
-        const num = buffer.readInt32BE(position);
-        position += 4;
-        result.push(num);
-      } else if (type === 3 || type === 4) {
-        const length = buffer.readUInt16BE(position);
-        position += 2;
-        const jsonStr = buffer.toString("utf8", position, position + length);
-        position += length;
-        result.push(JSON.parse(jsonStr));
-      } else {
-        console.warn("Unknown type:", type);
-        break;
-      }
+    if (Array.isArray(data)) {
+      rikResults = data
+        .filter(r => r.d1 && r.d2 && r.d3)
+        .map(r => ({
+          sid: r.sid,
+          d1: r.d1,
+          d2: r.d2,
+          d3: r.d3
+        }))
+        .sort((a, b) => b.sid - a.sid)
+        .slice(0, 50);
+      console.log("✅ Đã cập nhật dữ liệu mới.");
+    } else {
+      console.log("⚠️ Dữ liệu không hợp lệ:", data);
     }
-
-    return result.length === 1 ? result[0] : result;
-  } catch (e) {
-    console.error("Decode error:", e);
-    return null;
+  } catch (err) {
+    console.error("❌ Lỗi khi lấy dữ liệu API:", err.message);
   }
 }
 
-function connectRikWebSocket() {
-  console.log("🔌 Connecting to SunWin WebSocket...");
-  rikWS = new WebSocket(`wss://websocket.azhkthg1.net/wsbinary?token=${TOKEN}`);
-
-  rikWS.on("open", () => {
-    const authPayload = [
-      1, "MiniGame", "SC_axoday", "vinhk122011",
-      {
-        info: "{\"ipAddress\":\"2a09:bac5:d46d:18be::277:9a\",\"wsToken\":\"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJ4b3NpZXVkZXAiLCJib3QiOjAsImlzTWVyY2hhbnQiOmZhbHNlLCJ2ZXJpZmllZEJhbmtBY2NvdW50IjpmYWxzZSwicGxheUV2ZW50TG9iYnkiOmZhbHNlLCJjdXN0b21lcklkIjoyNzM1MzU3OTcsImFmZklkIjoiNmMyYzIzMmMtNjkyYi00NTU5LThmYjEtZDk0NDVlMDJlOTg0IiwiYmFubmVkIjpmYWxzZSwiYnJhbmQiOiJzdW4ud2luIiwidGltZXN0YW1wIjoxNzUzNDEwMTY1NDE2LCJsb2NrR2FtZXMiOltdLCJhbW91bnQiOjAsImxvY2tDaGF0IjpmYWxzZSwicGhvbmVWZXJpZmllZCI6dHJ1ZSwiaXBBZGRyZXNzIjoiMmEwOTpiYWM1OmQ0NmQ6MThiZTo6Mjc3OjlhIiwibXV0ZSI6ZmFsc2UsImF2YXRhciI6Imh0dHBzOi8vaW1hZ2VzLnN3aW5zaG9wLm5ldC9pbWFnZXMvYXZhdGFyL2F2YXRhcl8wMi5wbmciLCJwbGF0Zm9ybUlkIjo1LCJ1c2VySWQiOiI2YzJjMjMyYy02OTJiLTQ1NTktOGZiMS1kOTQ0NWUwMmU5ODQiLCJyZWdUaW1lIjoxNzUxMzU2NjYwOTkzLCJwaG9uZSI6Ijg0OTE0NzkxOTc4IiwiZGVwb3NpdCI6dHJ1ZSwidXNlcm5hbWUiOiJTQ19heG9kYXkifQ.2Ae24grIZHookLXR1JlR9bcxiHQ8WZ-9UGsWD8hDjQM\",\"locale\":\"vi\",\"userId\":\"6c2c232c-692b-4559-8fb1-d9445e02e984\",\"username\":\"SC_axoday\",\"timestamp\":1753410165416,\"refreshToken\":\"67c39d707f48422f8b5c0049484e263d.cd09f44a7a6e4555bed6fc5daeabee26\"}",
-        signature: "10F4A15998686829AB2C8C2DBED3275A0D6A6A122709F1B156A28D600258ADD4C38DE65AEBE54AE786353F3B6818482C0F6D92723785919A4D7C9F13279A46B23D0AB780B1DBD91EA07280342C6D923280820056B6AE4ED2FA62A83B2D4716D1ADE5B3A603F1E12AEAA477439C7735DD6B1BD82FB3950536DFD4A5509875DA9B",
-        pid: 5,
-        subi: true
-      }
-    ];
-    rikWS.send(JSON.stringify(authPayload));
-    clearInterval(rikIntervalCmd);
-    rikIntervalCmd = setInterval(sendRikCmd1005, 5000);
-  });
-
-  rikWS.on("message", (data) => {
-    try {
-      const json = typeof data === "string" ? JSON.parse(data) : decodeBinaryMessage(data);
-      if (!json) return;
-
-      if (Array.isArray(json) && json[3]?.res?.d1 && json[3]?.res?.sid) {
-        const result = json[3].res;
-        if (!rikCurrentSession || result.sid > rikCurrentSession) {
-          rikCurrentSession = result.sid;
-          rikResults.unshift({
-            sid: result.sid,
-            d1: result.d1,
-            d2: result.d2,
-            d3: result.d3
-          });
-          if (rikResults.length > 50) rikResults.pop();
-          console.log(`📥 Phiên mới ${result.sid} → ${getTX(result.d1, result.d2, result.d3)}`);
-          setTimeout(() => {
-            if (rikWS) rikWS.close();
-            connectRikWebSocket();
-          }, 1000);
-        }
-      } else if (Array.isArray(json) && json[1]?.htr) {
-        const history = json[1].htr
-          .map(item => ({ sid: item.sid, d1: item.d1, d2: item.d2, d3: item.d3 }))
-          .sort((a, b) => b.sid - a.sid);
-        rikResults = history.slice(0, 50);
-        console.log("📦 Lấy lịch sử thành công.");
-      }
-    } catch (e) {
-      console.error("❌ Parse error:", e.message);
-    }
-  });
-
-  rikWS.on("close", () => {
-    console.log("🔌 WebSocket disconnected. Reconnecting...");
-    setTimeout(connectRikWebSocket, 5000);
-  });
-
-  rikWS.on("error", (err) => {
-    console.error("🔌 WebSocket error:", err.message);
-    rikWS.close();
-  });
-}
-
-// Kết nối ban đầu
-connectRikWebSocket();
+// Gọi ban đầu và lặp lại
+fetchData();
+setInterval(fetchData, 5000);
 
 // Đăng ký CORS
 fastify.register(cors);
 
-// API chính
+// API dự đoán
 fastify.get("/axobantol", async () => {
   const validResults = rikResults.filter(item => item.d1 && item.d2 && item.d3);
   if (validResults.length < 1) return { message: "Không đủ dữ liệu." };
 
-  const current = validResults[0]; // phiên hiện tại là mới nhất
+  const current = validResults[0]; // phiên mới nhất
   const sumCurrent = current.d1 + current.d2 + current.d3;
   const ketQuaCurrent = sumCurrent >= 11 ? "Tài" : "Xỉu";
 
