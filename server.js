@@ -295,18 +295,8 @@ fastify.get("/axobantol", async () => {
   const validResults = rikResults.filter(item => item.d1 && item.d2 && item.d3);
   if (validResults.length < 1) return { message: "Không đủ dữ liệu." };
 
-  const current = validResults[0]; // phiên mới nhấif (data && data.xuc_xac1 && data.xuc_xac2 && data.xuc_xac3 && data.phien) {
-  rikResults.unshift({
-    sid: data.phien,
-    d1: data.xuc_xac1,
-    d2: data.xuc_xac2,
-    d3: data.xuc_xac3
-  });
-  if (rikResults.length > 50) rikResults.pop();
-  console.log(`✅ Dữ liệu OK: phiên ${data.phien}`);
-} else {
-  console.warn("⚠️ DỮ liệu không hợp lệ:", data);
-}
+  const current = validResults[0]; // phiên mới nhất
+
   const sumCurrent = current.d1 + current.d2 + current.d3;
   const ketQuaCurrent = sumCurrent >= 11 ? "Tài" : "Xỉu";
 
