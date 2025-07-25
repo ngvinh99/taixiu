@@ -8,12 +8,12 @@ const PORT = process.env.PORT || 3001;
 let rikResults = [];
 
 const PATTERN_MAP = {
-  "TXT": "Xỉu", 
-  "TTXX": "Tài", 
-  "XXTXX": "Tài", 
-  "TTX": "Xỉu", 
+  "TXT": "Xỉu",
+  "TTXX": "Tài",
+  "XXTXX": "Tài",
+  "TTX": "Xỉu",
   "XTT": "Tài",
-  "TXX": "Tài", 
+  "TXX": "Tài",
 };
 
 function getDuDoanFromPattern(pattern) {
@@ -24,13 +24,17 @@ function getDuDoanFromPattern(pattern) {
   return { du_doan: "?", khop_pattern: null };
 }
 
-// Lấy dữ liệu từ API bên ngoài mỗi 5 giây
+function getTX(d1, d2, d3) {
+  const sum = d1 + d2 + d3;
+  return sum >= 11 ? "T" : "X";
+}
+
+// ✅ Lấy dữ liệu từ API
 async function fetchData() {
   try {
     const res = await axios.get("https://apigame-wy0p.onrender.com/api/sunwin");
     const data = res.data;
 
-    // Kiểm tra nếu dữ liệu hợp lệ
     if (
       data &&
       typeof data.phien === "number" &&
@@ -45,39 +49,39 @@ async function fetchData() {
         d3: data.xuc_xac3,
       };
 
-      // Nếu chưa có trong danh sách thì thêm vào đầu
       if (!rikResults.some(item => item.sid === newResult.sid)) {
         rikResults.unshift(newResult);
-        if (rikResults.length > 50) rikResults.pop(); // Giữ 50 dòng
-        console.log(`Đã thêm phiên ${newResult.sid}`);
+        if (rikResults.length > 50) rikResults.pop();
+        console.log(`✅ Thêm phiên ${newResult.sid} (${newResult.d1},${newResult.d2},${newResult.d3})`);
       }
+    } else {
+      console.warn("❌ Dữ liệu API không hợp lệ:", data);
     }
-  } catch (error) {
-    console.error("Lỗi fetchData:", error.message);
+  } catch (err) {
+    console.error("❌ Lỗi fetchData:", err.message);
   }
 }
 
-// Gọi ban đầu và lặp lại
+// 👉 Gọi lần đầu và lặp mỗi 5 giây
 fetchData();
 setInterval(fetchData, 5000);
 
-// Đăng ký CORS
+// ✅ CORS
 fastify.register(cors);
 
-// API dự đoán
+// ✅ API dự đoán
 fastify.get("/axobantol", async () => {
   const validResults = rikResults.filter(item => item.d1 && item.d2 && item.d3);
-  if (validResults.length < 1) return { message: "Không đủ dữ liệu." };
+  if (validResults.length === 0) return { message: "Không đủ dữ liệu." };
 
-  const current = validResults[0]; // phiên mới nhất
-
+  const current = validResults[0];
   const sumCurrent = current.d1 + current.d2 + current.d3;
   const ketQuaCurrent = sumCurrent >= 11 ? "Tài" : "Xỉu";
 
   const duongCau = validResults
     .slice(0, 13)
     .reverse()
-    .map(r => (r.d1 + r.d2 + r.d3 >= 11 ? "t" : "x"))
+    .map(r => getTX(r.d1, r.d2, r.d3))
     .join("");
 
   const { du_doan, khop_pattern } = getDuDoanFromPattern(duongCau.toUpperCase());
@@ -94,7 +98,7 @@ fastify.get("/axobantol", async () => {
   };
 });
 
-// Start server
+// ✅ Start server
 const start = async () => {
   try {
     const address = await fastify.listen({ port: PORT, host: "0.0.0.0" });
