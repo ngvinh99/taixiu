@@ -168,42 +168,54 @@ function connectWebSocket() {
   });
 
   ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message);
-      if (Array.isArray(data) && typeof data[1] === 'object') {
-        const cmd = data[1].cmd;
-        if (cmd === 1008 && data[1].sid) {
-          id_phien_chua_co_kq = data[1].sid;
-        }
-        if (cmd === 1003 && data[1].gBB) {
-          const { d1, d2, d3 } = data[1];
-          const total = d1 + d2 + d3;
-          const result = getTaiXiu(total);
+  try {
+    const data = JSON.parse(message);
+    if (Array.isArray(data) && typeof data[1] === 'object') {
+      const cmd = data[1].cmd;
 
-          totalsList.push(total);
-          if (totalsList.length > 100) totalsList.shift();
-
-          const [prediction, confidence, reason, stats] = aiHtddLogic(totalsList);
-
-          currentData = {
-            phien_cu: id_phien_chua_co_kq,
-            ket_qua: result,
-            xuc_xac: [d1, d2, d3],
-            phien_moi: id_phien_chua_co_kq + 1,
-            pattern: JSON.stringify(stats),
-            khop_pattern: reason,
-            du_doan: prediction,
-            id: "@axobantool"
-          };
-
-          console.log(`🎲 Phiên ${id_phien_chua_co_kq}: ${d1}-${d2}-${d3} = ${total} (${result}) → AI: ${prediction} (${confidence}%) - ${reason}`);
-          id_phien_chua_co_kq = null;
-        }
+      // Nhận phiên mới (sid)
+      if (cmd === 1008 && data[1].sid) {
+        id_phien_chua_co_kq = data[1].sid;
       }
-    } catch (e) {
-      console.error('[❌] Lỗi xử lý:', e.message);
+
+      // Nhận kết quả (d1, d2, d3)
+      if (cmd === 1003 && data[1].gBB) {
+        if (!id_phien_chua_co_kq) {
+          // Nếu chưa có sid (1008) thì không xử lý
+          console.warn('[⏳] Bỏ qua 1003 vì chưa có id_phien_chua_co_kq');
+          return;
+        }
+
+        const { d1, d2, d3 } = data[1];
+        const total = d1 + d2 + d3;
+        const result = getTaiXiu(total);
+
+        totalsList.push(total);
+        if (totalsList.length > 100) totalsList.shift();
+
+        const [prediction, confidence, reason, stats] = aiHtddLogic(totalsList);
+
+        currentData = {
+          phien_cu: id_phien_chua_co_kq,
+          ket_qua: result,
+          xuc_xac: [d1, d2, d3],
+          phien_moi: id_phien_chua_co_kq + 1,
+          pattern: JSON.stringify(stats),
+          khop_pattern: reason,
+          du_doan: prediction,
+          id: "@axobantool"
+        };
+
+        console.log(`🎲 Phiên ${id_phien_chua_co_kq}: ${d1}-${d2}-${d3} = ${total} (${result}) → AI: ${prediction} (${confidence}%) - ${reason}`);
+
+        // ✅ Reset lại sid sau xử lý
+        id_phien_chua_co_kq = null;
+      }
     }
-  });
+  } catch (e) {
+    console.error('[❌] Lỗi xử lý:', e.message);
+  }
+});
 
   ws.on('close', () => {
     console.log('[🔌] Mất kết nối WebSocket. Reconnecting...');
