@@ -326,56 +326,57 @@ function connectWebSocket() {
   });
 
   ws.on('message', (message) => {
-    try {
-      const data = JSON.parse(message);
-      if (Array.isArray(data) && typeof data[1] === 'object') {
-        const cmd = data[1].cmd;
+  try {
+    const data = JSON.parse(message);
+    if (Array.isArray(data) && typeof data[1] === 'object') {
+      const cmd = data[1].cmd;
 
-        if (cmd === 1008 && data[1].sid) {
-          id_phien_chua_co_kq = data[1].sid;
-        }
-
-        if (cmd === 1003 && data[1].gBB) {
-          const { d1, d2, d3 } = data[1];
-          const total = d1 + d2 + d3;
-          const result = total > 10 ? "Tài" : "Xỉu";
-
-          patternHistory.push(result[0]); // 'T' hoặc 'X'
-          if (patternHistory.length > 20) patternHistory.shift();
-
-          const patternStr = patternHistory.join("");
-          let matchedPattern = "";
-          let prediction = "";
-
-          // Tìm pattern khớp dài nhất
-          for (let len = 8; len >= 4; len--) {
-            const check = patternStr.slice(-len);
-            if (PATTERN_MAP[check]) {
-              matchedPattern = check;
-              prediction = PATTERN_MAP[check];
-              break;
-            }
-          }
-
-          currentData = {
-            phien_cu: id_phien_chua_co_kq,
-            ket_qua: result,
-            xuc_xac: [d1, d2, d3],
-            phien_moi: id_phien_chua_co_kq + 1,
-            pattern: patternStr,
-            khop_pattern: matchedPattern,
-            du_doan: prediction || "?",
-            id: "@axobantool"
-          };
-
-          console.log(`🎲 Phiên ${id_phien_chua_co_kq}: ${d1}-${d2}-${d3} = ${total} (${result}) → Dự đoán: ${prediction || "?"}`);
-          id_phien_chua_co_kq = null;
-        }
+      if (cmd === 1008 && data[1].sid) {
+        // Ghi nhận phiên mới chờ kết quả
+        id_phien_chua_co_kq = data[1].sid;
       }
-    } catch (e) {
-      console.error('[❌] Lỗi xử lý:', e.message);
+
+      if (cmd === 1003 && data[1].gBB && id_phien_chua_co_kq !== null) {
+        const { d1, d2, d3 } = data[1];
+        const total = d1 + d2 + d3;
+        const result = total > 10 ? "Tài" : "Xỉu";
+
+        // Chỉ thêm vào history nếu có phiên xác nhận
+        patternHistory.push(result[0]); // 'T' hoặc 'X'
+        if (patternHistory.length > 20) patternHistory.shift();
+
+        const patternStr = patternHistory.join("");
+        let matchedPattern = "";
+        let prediction = "";
+
+        for (let len = 8; len >= 4; len--) {
+          const check = patternStr.slice(-len);
+          if (PATTERN_MAP[check]) {
+            matchedPattern = check;
+            prediction = PATTERN_MAP[check];
+            break;
+          }
+        }
+
+        currentData = {
+          phien_cu: id_phien_chua_co_kq,
+          ket_qua: result,
+          xuc_xac: [d1, d2, d3],
+          phien_moi: id_phien_chua_co_kq + 1,
+          pattern: patternStr,
+          khop_pattern: matchedPattern,
+          du_doan: prediction || "?",
+          id: "@axobantool"
+        };
+
+        console.log(`🎲 Phiên ${id_phien_chua_co_kq}: ${d1}-${d2}-${d3} = ${total} (${result}) → Dự đoán: ${prediction || "?"}`);
+        id_phien_chua_co_kq = null; // reset lại
+      }
     }
-  });
+  } catch (e) {
+    console.error('[❌] Lỗi xử lý:', e.message);
+  }
+});
 
   ws.on('close', () => {
     console.log('[🔌] Mất kết nối WebSocket. Đang reconnect...');
