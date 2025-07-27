@@ -1,12 +1,12 @@
-const WebSocket = require('ws');
 const express = require('express');
+const WebSocket = require('ws');
 const cors = require('cors');
 
 const app = express();
 app.use(cors());
 const PORT = process.env.PORT || 5000;
 
-// === Biến lưu trạng thái ===
+// === Biến lưu kết quả và lịch sử AI ===
 let currentData = {
   phien_cu: null,
   ket_qua: null,
@@ -17,389 +17,423 @@ let currentData = {
   du_doan: "",
   id: "@axobantool"
 };
+let history = [];
+let modelPredictions = {};
 let id_phien_chua_co_kq = null;
-let patternHistory = [];
 
-// === Thuật toán dự đoán theo pattern ===
-const PATTERN_MAP = {
-  "TXT": "Xỉu", 
-  "TTXX": "Tài", 
-  "XXTXX": "Tài", 
-  "TTX": "Xỉu", 
-  "XTT": "Tài",
-  "TXX": "Tài", 
-  "XTX": "Xỉu", 
-  "TXTX": "Tài", 
-  "XTXX": "Tài", 
-  "XXTX": "Tài",
-  "TXTT": "Xỉu", 
-  "TTT": "Tài", 
-  "XXX": "Tài", 
-  "TXXT": "Tài", 
-  "XTXT": "Xỉu",
-  "TXXT": "Tài", 
-  "XXTT": "Tài", 
-  "TTXX": "Xỉu", 
-  "XTTX": "Tài", 
-  "XTXTX": "Tài",
-  "TTXXX": "Tài", 
-  "XTTXT": "Tài", 
-  "XXTXT": "Xỉu", 
-  "TXTTX": "Tài", 
-  "XTXXT": "Tài",
-  "TTTXX": "Xỉu", 
-  "XXTTT": "Tài", 
-  "XTXTT": "Tài", 
-  "TXTXT": "Tài", 
-  "TTXTX": "Xỉu",
-  "TXTTT": "Xỉu", 
-  "XXTXTX": "Tài", 
-  "XTXXTX": "Tài", 
-  "TXTTTX": "Tài", 
-  "TTTTXX": "Xỉu",
-  "XTXTTX": "Tài", 
-  "XTXXTT": "Tài", 
-  "TXXTXX": "Tài", 
-  "XXTXXT": "Tài", 
-  "TXTTXX": "Xỉu",
-  "TTTXTX": "Xỉu", 
-  "TTXTTT": "Tài", 
-  "TXXTTX": "Tài", 
-  "XXTTTX": "Tài", 
-  "XTTTTX": "Xỉu",
-  "TXTXTT": "Tài", 
-  "TXTXTX": "Tài", 
-  "TTTTX": "Tài", 
-  "XXXTX": "Tài", 
-  "TXTTTX": "Xỉu",
-  "XTXXXT": "Tài", 
-  "XXTTXX": "Tài", 
-  "TTTXXT": "Xỉu", 
-  "XXTXXX": "Tài", 
-  "XTXTXT": "Tài",
-  "TTXXTX": "Tài", 
-  "TTXXT": "Tài", 
-  "TXXTX": "Xỉu", 
-  "XTXXX": "Tài", 
-  "XTXTX": "Xỉu",
-  "TTXT": "Xỉu", 
-  "TTTXT": "Xỉu",
-  "TTTT": "Tài",
-  "TTTTT": "Tài",
-  "TTTTTT": "Xỉu",
-  "TTTTTTT": "Tài",
-  "TTTTTTX": "Xỉu",
-  "TTTTTX": "Xỉu",
-  "TTTTTXT": "Xỉu",
-  "TTTTTXX": "Tài",
-  "TTTTXT": "Xỉu",
-  "TTTTXTT": "Tài",
-  "TTTTXTX": "Xỉu",
-  "TTTTXXT": "Xỉu",
-  "TTTTXXX": "Tài",
-  "TTTX": "Xỉu",
-  "TTTXTT": "Tài",
-  "TTTXTTT": "Xỉu",
-  "TTTXTTX": "Xỉu",
-  "TTTXTXT": "Tài",
-  "TTTXTXX": "Tài",
-  "TTTXXTT": "Tài",
-  "TTTXXTX": "Tài",
-  "TTTXXX": "Xỉu",
-  "TTTXXXT": "Tài",
-  "TTTXXXX": "Xỉu",
-  "TTXTT": "Xỉu",
-  "TTXTTTT": "Xỉu",
-  "TTXTTTX": "Xỉu",
-  "TTXTTX": "Tài",
-  "TTXTTXT": "Tài",
-  "TTXTTXX": "Xỉu",
-  "TTXTXT": "Xỉu",
-  "TTXTXTT": "Tài",
-  "TTXTXTX": "Tài",
-  "TTXTXX": "Xỉu",
-  "TTXTXXT": "Tài",
-  "TTXTXXX": "Xỉu",
-  "TTXXTT": "Tài",
-  "TTXXTTT": "Xỉu",
-  "TTXXTTX": "Tài",
-  "TTXXTXT": "Tài",
-  "TTXXTXX": "Xỉu",
-  "TTXXXT": "Xỉu",
-  "TTXXXTT": "Tài",
-  "TTXXXTX": "Tài",
-  "TTXXXX": "Xỉu",
-  "TTXXXXT": "Tài",
-  "TTXXXXX": "Xỉu",
-  "TXTTTT": "Xỉu",
-  "TXTTTTT": "Xỉu",
-  "TXTTTTX": "Xỉu",
-  "TXTTTXT": "Xỉu",
-  "TXTTTXX": "Tài",
-  "TXTTXT": "Tài",
-  "TXTTXTT": "Tài",
-  "TXTTXTX": "Tài",
-  "TXTTXXT": "Tài",
-  "TXTTXXX": "Tài",
-  "TXTXTTT": "Tài",
-  "TXTXTTX": "Tài",
-  "TXTXTXT": "Xỉu",
-  "TXTXTXX": "Tài",
-  "TXTXX": "Tài",
-  "TXTXXT": "Tài",
-  "TXTXXTT": "Tài",
-  "TXTXXTX": "Xỉu",
-  "TXTXXX": "Xỉu",
-  "TXTXXXT": "Xỉu",
-  "TXTXXXX": "Xỉu",
-  "TXXTT": "Tài",
-  "TXXTTT": "Tài",
-  "TXXTTTT": "Tài",
-  "TXXTTTX": "Tài",
-  "TXXTTXT": "Xỉu",
-  "TXXTTXX": "Xỉu",
-  "TXXTXT": "Tài",
-  "TXXTXTT": "Tài",
-  "TXXTXTX": "Tài",
-  "TXXTXXT": "Tài",
-  "TXXTXXX": "Xỉu",
-  "TXXX": "Tài",
-  "TXXXT": "Tài",
-  "TXXXTT": "Xỉu",
-  "TXXXTTT": "Tài",
-  "TXXXTTX": "Xỉu",
-  "TXXXTX": "Xỉu",
-  "TXXXTXT": "Tài",
-  "TXXXTXX": "Xỉu",
-  "TXXXX": "Xỉu",
-  "TXXXXT": "Tài",
-  "TXXXXTT": "Xỉu",
-  "TXXXXTX": "Xỉu",
-  "TXXXXX": "Tài",
-  "TXXXXXT": "Xỉu",
-  "TXXXXXX": "Xỉu",
-  "XTTT": "Xỉu",
-  "XTTTT": "Xỉu",
-  "XTTTTT": "Tài",
-  "XTTTTTT": "Tài",
-  "XTTTTTX": "Tài",
-  "XTTTTXT": "Tài",
-  "XTTTTXX": "Xỉu",
-  "XTTTX": "Tài",
-  "XTTTXT": "Xỉu",
-  "XTTTXTT": "Tài",
-  "XTTTXTX": "Xỉu",
-  "XTTTXX": "Tài",
-  "XTTTXXT": "Tài",
-  "XTTTXXX": "Tài",
-  "XTTXTT": "Tài",
-  "XTTXTTT": "Tài",
-  "XTTXTTX": "Tài",
-  "XTTXTX": "Xỉu",
-  "XTTXTXT": "Tài",
-  "XTTXTXX": "Xỉu",
-  "XTTXX": "Xỉu",
-  "XTTXXT": "Xỉu",
-  "XTTXXTT": "Tài",
-  "XTTXXTX": "Xỉu",
-  "XTTXXX": "Tài",
-  "XTTXXXT": "Xỉu",
-  "XTTXXXX": "Tài",
-  "XTXTTT": "Tài",
-  "XTXTTTT": "Tài",
-  "XTXTTTX": "Xỉu",
-  "XTXTTXT": "Xỉu",
-  "XTXTTXX": "Tài",
-  "XTXTXTT": "Tài",
-  "XTXTXTX": "Xỉu",
-  "XTXTXX": "Tài",
-  "XTXTXXT": "Tài",
-  "XTXTXXX": "Tài",
-  "XTXXTTT": "Tài",
-  "XTXXTTX": "Xỉu",
-  "XTXXTXT": "Tài",
-  "XTXXTXX": "Tài",
-  "XTXXXTT": "Xỉu",
-  "XTXXXTX": "Tài",
-  "XTXXXX": "Xỉu",
-  "XTXXXXT": "Tài",
-  "XTXXXXX": "Tài",
-  "XXT": "Xỉu",
-  "XXTTTT": "Tài",
-  "XXTTTTT": "Xỉu",
-  "XXTTTTX": "Tài",
-  "XXTTTXT": "Xỉu",
-  "XXTTTXX": "Xỉu",
-  "XXTTX": "Tài",
-  "XXTTXT": "Xỉu",
-  "XXTTXTT": "Xỉu",
-  "XXTTXTX": "Tài",
-  "XXTTXXT": "Xỉu",
-  "XXTTXXX": "Tài",
-  "XXTXTT": "Tài",
-  "XXTXTTT": "Tài",
-  "XXTXTTX": "Xỉu",
-  "XXTXTXT": "Tài",
-  "XXTXTXX": "Tài",
-  "XXTXXTT": "Xỉu",
-  "XXTXXTX": "Xỉu",
-  "XXTXXXT": "Tài",
-  "XXTXXXX": "Tài",
-  "XXXT": "Tài",
-  "XXXTT": "Xỉu",
-  "XXXTTT": "Xỉu",
-  "XXXTTTT": "Xỉu",
-  "XXXTTTX": "Xỉu",
-  "XXXTTX": "Tài",
-  "XXXTTXT": "Xỉu",
-  "XXXTTXX": "Xỉu",
-  "XXXTXT": "Tài",
-  "XXXTXTT": "Tài",
-  "XXXTXTX": "Xỉu",
-  "XXXTXX": "Tài",
-  "XXXTXXT": "Xỉu",
-  "XXXTXXX": "Tài",
-  "XXXX": "Tài",
-  "XXXXT": "Xỉu",
-  "XXXXTT": "Xỉu",
-  "XXXXTTT": "Tài",
-  "XXXXTTX": "Tài",
-  "XXXXTX": "Tài",
-  "XXXXTXT": "Tài",
-  "XXXXTXX": "Tài",
-  "XXXXX": "Tài",
-  "XXXXXT": "Xỉu",
-  "XXXXXTT": "Tài",
-  "XXXXXTX": "Tài",
-  "XXXXXX": "Tài",
-  "XXXXXXT": "Tài",
-  "XXXXXXX": "Tài"
-};
+// === WebSocket kết nối đến SunWin ===
+const ws = new WebSocket("wss://socket.sunwin.gg:881");
 
-// === Danh sách tin nhắn gửi lên server WebSocket ===
 const messagesToSend = [
-  [1, "MiniGame", "SC_apisunwin123", "binhlamtool90", {
-    info: JSON.stringify({
-      ipAddress: "2001:ee0:5708:7700:f151:dedc:c5ad:6bc3",
-      wsToken: "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJhcGlzdW53aW52YyIsImJvdCI6MCwiaXNNZXJjaGFudCI6ZmFsc2UsInZlcmlmaWVkQmFua0FjY291bnQiOmZhbHNlLCJwbGF5RXZlbnRMb2JieSI6ZmFsc2UsImN1c3RvbWVySWQiOjI3NjQ3ODE3MywiYWZmSWQiOiJkOTNkM2Q4NC1mMDY5LTRiM2YtOGRhYy1iNDcxNmE4MTIxNDMiLCJiYW5uZWQiOmZhbHNlLCJicmFuZCI6InN1bi53aW4iLCJ0aW1lc3RhbXAiOjE3NTM0MjQ1MTk4MTEsImxvY2tHYW1lcyI6W10sImFtb3VudCI6MCwibG9ja0NoYXQiOmZhbHNlLCJwaG9uZVZlcmlmaWVkIjpmYWxzZSwiaXBBZGRyZXNzIjoiMjAwMTplZTA6NTcwODo3NzAwOmYxNTE6ZGVkYzpjNWFkOjZiYzMiLCJtdXRlIjpmYWxzZSwiYXZhdGFyIjoiaHR0cHM6Ly9pbWFnZXMuc3dpbnNob3AubmV0L2ltYWdlcy9hdmF0YXIvYXZhdGFyXzIwLnBuZyIsInBsYXRmb3JtSWQiOjUsInVzZXJJZCI6ImQ5M2QzZDg0LWYwNjktNGIzZi04ZGFjLWI0NzE2YTgxMjE0MyIsInJlZ1RpbWUiOjE3NTIwNDU4OTMyOTIsInBob25lIjoiIiwiZGVwb3NpdCI6ZmFsc2UsInVzZXJuYW1lIjoiU0NfYXBpc3Vud2luMTIzIn0.DkO6wd7li1GW3w2CtB7XMK790uduElJZwpw38DdWKW4",
-      userId: "d93d3d84-f069-4b3f-8dac-b4716a812143",
-      username: "SC_apisunwin123",
-      timestamp: 1753424519812
-    }),
-    signature: "7B15315084F3B2A31627D96565E185792B8F0855BC3D2949CCC02EB06F53B35E7FF0A54BD072E07E0AA72C60BAF4FC4569B286E1EE2B095EDEF38F738A23C1A8BA9E3F6C9D5C02FEC1BFE3D58B50BBBBDEB5E54E33CA7442EDB3B186BBD9AD986EBF1DE5DF064F68443EFE7CE3890A9FF3B5DB3F61FD0AB894F0BD8F484669D2"
-  }],
-  [6, "MiniGame", "taixiuPlugin", { cmd: 1005 }],
-  [6, "MiniGame", "lobbyPlugin", { cmd: 10001 }]
+  { id: 2, type: 1, command: 1002, data: { GameId: 111 } },
+  { id: 3, type: 1, command: 1000, data: {} },
+  { id: 4, type: 1, command: 1001, data: { GameId: 111 } },
 ];
 
-// === WebSocket ===
-let ws = null;
-let pingInterval = null;
-let reconnectTimeout = null;
-
-function connectWebSocket() {
-  ws = new WebSocket(
-    "wss://websocket.azhkthg1.net/websocket?token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJhbW91bnQiOjAsImdlbmRlciI6MCwiZGlzcGxheU5hbWUiOiJ0YW9sYWJpbmgxMjk5IiwicGhvbmVWZXJpZmllZCI6ZmFsc2UsImJvdCI6MCwiYXZhdGFyIjoiaHR0cHM6Ly9pbWFnZXMuc3dpbnNob3AubmV0L2ltYWdlcy9hdmF0YXIvYXZhdGFyXzAyLnBuZyIsInVzZXJJZCI6IjZhNWNmN2NmLTQ0ODYtNGJlNS1hMDIzLTUyOTkyOGUyZDg1YyIsInJlZ1RpbWUiOjE3NTI3NjcyOTk2OTgsInBob25lIjoiIiwiY3VzdG9tZXJJZCI6MjgzNTEyODQ1LCJicmFuZCI6InN1bi53aW4iLCJ1c2VybmFtZSI6IlNDX2FuaGxhdHJ1bWFwaTEiLCJ0aW1lc3RhbXAiOjE3NTI3ODczMDg2NTl9.5PQjsPsm2G7SyEnAbNqXtxkxYlMQIwcJpxjh1l_hH6c",
-    {
-      headers: {
-        "User-Agent": "Mozilla/5.0",
-        "Origin": "https://play.sun.win"
-      }
-    }
-  );
-
-  ws.on('open', () => {
-    console.log('[✅] Đã kết nối WebSocket');
-    messagesToSend.forEach((msg, i) => {
-      setTimeout(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify(msg));
-        }
-      }, i * 600);
-    });
-
-    pingInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.ping();
-      }
-    }, 15000);
+ws.on('open', () => {
+  messagesToSend.forEach(msg => {
+    ws.send(JSON.stringify(msg));
   });
+  console.log("✅ Đã kết nối tới SunWin WebSocket");
+});
 
-  ws.on('message', (message) => {
+ws.on('message', (data) => {
   try {
-    const data = JSON.parse(message);
-    if (Array.isArray(data) && typeof data[1] === 'object') {
-      const cmd = data[1].cmd;
+    const msg = JSON.parse(data);
+    const { cmd, data: d } = msg;
 
-      if (cmd === 1008 && data[1].sid) {
-        // Ghi nhận phiên mới chờ kết quả
-        id_phien_chua_co_kq = data[1].sid;
-      }
-
-      if (cmd === 1003 && data[1].gBB && id_phien_chua_co_kq !== null) {
-        const { d1, d2, d3 } = data[1];
-        const total = d1 + d2 + d3;
-        const result = total > 10 ? "Tài" : "Xỉu";
-
-        // Chỉ thêm vào history nếu có phiên xác nhận
-        patternHistory.push(result[0]); // 'T' hoặc 'X'
-        if (patternHistory.length > 20) patternHistory.shift();
-
-        const patternStr = patternHistory.join("");
-        let matchedPattern = "";
-        let prediction = "";
-
-        for (let len = 8; len >= 4; len--) {
-          const check = patternStr.slice(-len);
-          if (PATTERN_MAP[check]) {
-            matchedPattern = check;
-            prediction = PATTERN_MAP[check];
-            break;
-          }
-        }
-
-        currentData = {
-          phien_cu: id_phien_chua_co_kq,
-          ket_qua: result,
-          xuc_xac: [d1, d2, d3],
-          phien_moi: id_phien_chua_co_kq + 1,
-          pattern: patternStr,
-          khop_pattern: matchedPattern,
-          du_doan: prediction || "?",
-          id: "@axobantool"
-        };
-
-        console.log(`🎲 Phiên ${id_phien_chua_co_kq}: ${d1}-${d2}-${d3} = ${total} (${result}) → Dự đoán: ${prediction || "?"}`);
-        id_phien_chua_co_kq = null; // reset lại
-      }
+    if (cmd === 1004 && d?.[0]?.id !== undefined) {
+      id_phien_chua_co_kq = d[0].id;
     }
-  } catch (e) {
-    console.error('[❌] Lỗi xử lý:', e.message);
+
+    if (cmd === 1003 && d?.gBB) {
+      const { d1, d2, d3 } = d;
+      const total = d1 + d2 + d3;
+      const result = total > 10 ? "Tài" : "Xỉu";
+
+      history.push({
+        session: id_phien_chua_co_kq,
+        result,
+        totalScore: total,
+        dice: [d1, d2, d3]
+      });
+      if (history.length > 50) history.shift();
+
+      const prediction = generatePrediction(history, modelPredictions);
+
+      currentData = {
+        phien_cu: id_phien_chua_co_kq,
+        ket_qua: result,
+        xuc_xac: [d1, d2, d3],
+        phien_moi: id_phien_chua_co_kq + 1,
+        pattern: history.map(h => h.result[0]).join(""),
+        khop_pattern: "",
+        du_doan: prediction,
+        id: "@axobantool"
+      };
+
+      console.log(`🎲 Phiên ${id_phien_chua_co_kq}: ${d1}-${d2}-${d3} = ${total} (${result}) → Dự đoán AI: ${prediction}`);
+      id_phien_chua_co_kq = null;
+    }
+  } catch (err) {
+    console.error("❌ Lỗi xử lý message:", err);
   }
 });
 
-  ws.on('close', () => {
-    console.log('[🔌] Mất kết nối WebSocket. Đang reconnect...');
-    clearInterval(pingInterval);
-    reconnectTimeout = setTimeout(connectWebSocket, 2500);
-  });
-
-  ws.on('error', (err) => {
-    console.error('[⚠️] WebSocket lỗi:', err.message);
-  });
-}
-
-// === API ===
-app.get('/axobantol', (req, res) => {
+// === API JSON REST ===
+app.get('/taixiu', (req, res) => {
   res.json(currentData);
 });
 
-app.get('/', (req, res) => {
-  res.send(`<h2>🎯 SunWin Tài Xỉu</h2><p><a href="/taixiu">Xem JSON kết quả</a></p>`);
-});
-
-// === Khởi động server ===
 app.listen(PORT, () => {
-  console.log(`[🌐] Server đang chạy tại http://localhost:${PORT}`);
-  connectWebSocket();
+
+// Helper function: Detect streak and break probability
+function detectStreakAndBreak(history) {
+  if (!history || history.length === 0) return { streak: 0, currentResult: null, breakProb: 0.0 };
+  let streak = 1;
+  const currentResult = history[history.length - 1].result;
+  for (let i = history.length - 2; i >= 0; i--) {
+    if (history[i].result === currentResult) {
+      streak++;
+    } else {
+      break;
+    }
+  }
+  const last15 = history.slice(-15).map(h => h.result);
+  if (!last15.length) return { streak, currentResult, breakProb: 0.0 };
+  const switches = last15.slice(1).reduce((count, curr, idx) => count + (curr !== last15[idx] ? 1 : 0), 0);
+  const taiCount = last15.filter(r => r === 'Tài').length;
+  const xiuCount = last15.filter(r => r === 'Xỉu').length;
+  const imbalance = Math.abs(taiCount - xiuCount) / last15.length;
+  let breakProb = 0.0;
+
+  if (streak >= 8) {
+    breakProb = Math.min(0.7 + (switches / 15) + imbalance * 0.2, 0.95);
+  } else if (streak >= 5) {
+    breakProb = Math.min(0.4 + (switches / 10) + imbalance * 0.3, 1.0);
+  } else if (streak >= 3 && switches >= 6) {
+    breakProb = 0.35;
+  }
+
+  return { streak, currentResult, breakProb };
+}
+
+// Helper function: Evaluate model performance
+function evaluateModelPerformance(history, modelName, lookback = 10) {
+  if (!modelPredictions[modelName] || history.length < 2) return 1.0;
+  lookback = Math.min(lookback, history.length - 1);
+  let correctCount = 0;
+  for (let i = 0; i < lookback; i++) {
+    const pred = modelPredictions[modelName][history[history.length - (i + 2)].session];
+    const actual = history[history.length - (i + 1)].result;
+    if (pred === actual) {
+      correctCount++;
+    }
+  }
+  const performanceScore = lookback > 0 ? 1.0 + (correctCount - lookback / 2) / (lookback / 2) : 1.0;
+  return Math.max(0.0, Math.min(2.0, performanceScore));
+}
+
+// Helper function: Smart bridge break model
+function smartBridgeBreak(history) {
+  if (!history || history.length < 5) return { prediction: 'Tài', breakProb: 0.0, reason: 'Không đủ dữ liệu để bẻ cầu' };
+
+  const { streak, currentResult, breakProb } = detectStreakAndBreak(history);
+  const last20 = history.slice(-20).map(h => h.result);
+  const lastScores = history.slice(-20).map(h => h.totalScore || 0);
+  let breakProbability = breakProb;
+  let reason = '';
+
+  const avgScore = lastScores.reduce((sum, score) => sum + score, 0) / (lastScores.length || 1);
+  const scoreDeviation = lastScores.reduce((sum, score) => sum + Math.abs(score - avgScore), 0) / (lastScores.length || 1);
+
+  const last5 = last20.slice(-5);
+  const patternCounts = {};
+  for (let i = 0; i <= last20.length - 3; i++) {
+    const pattern = last20.slice(i, i + 3).join(',');
+    patternCounts[pattern] = (patternCounts[pattern] || 0) + 1;
+  }
+  const mostCommonPattern = Object.entries(patternCounts).sort((a, b) => b[1] - a[1])[0];
+  const isStablePattern = mostCommonPattern && mostCommonPattern[1] >= 3;
+
+  if (streak >= 6) {
+    breakProbability = Math.min(breakProbability + 0.2, 0.95);
+    reason = `[Bẻ Cầu] Chuỗi ${streak} ${currentResult} quá dài, khả năng bẻ cầu cao`;
+  } else if (streak >= 4 && scoreDeviation > 3) {
+    breakProbability = Math.min(breakProbability + 0.15, 0.9);
+    reason = `[Bẻ Cầu] Biến động điểm số lớn (${scoreDeviation.toFixed(1)}), khả năng bẻ cầu tăng`;
+  } else if (isStablePattern && last5.every(r => r === currentResult)) {
+    breakProbability = Math.min(breakProbability + 0.1, 0.85);
+    reason = `[Bẻ Cầu] Phát hiện mẫu lặp ${mostCommonPattern[0]}, có khả năng bẻ cầu`;
+  } else {
+    breakProbability = Math.max(breakProbability - 0.1, 0.2);
+    reason = `[Bẻ Cầu] Không phát hiện mẫu bẻ cầu mạnh, tiếp tục theo cầu`;
+  }
+
+  let prediction = breakProbability > 0.6 ? (currentResult === 'Tài' ? 'Xỉu' : 'Tài') : currentResult;
+  return { prediction, breakProb: breakProbability, reason };
+}
+
+// Helper function: Trend and probability model
+function trendAndProb(history) {
+  const { streak, currentResult, breakProb } = detectStreakAndBreak(history);
+  if (streak >= 5) {
+    if (breakProb > 0.7) {
+      return currentResult === 'Tài' ? 'Xỉu' : 'Tài';
+    }
+    return currentResult;
+  }
+  const last15 = history.slice(-15).map(h => h.result);
+  if (!last15.length) return 'Tài';
+  const weights = last15.map((_, i) => Math.pow(1.3, i));
+  const taiWeighted = weights.reduce((sum, w, i) => sum + (last15[i] === 'Tài' ? w : 0), 0);
+  const xiuWeighted = weights.reduce((sum, w, i) => sum + (last15[i] === 'Xỉu' ? w : 0), 0);
+  const totalWeight = taiWeighted + xiuWeighted;
+  const last10 = last15.slice(-10);
+  const patterns = [];
+  if (last10.length >= 4) {
+    for (let i = 0; i <= last10.length - 4; i++) {
+      patterns.push(last10.slice(i, i + 4).join(','));
+    }
+  }
+  const patternCounts = patterns.reduce((acc, p) => { acc[p] = (acc[p] || 0) + 1; return acc; }, {});
+  const mostCommon = Object.entries(patternCounts).sort((a, b) => b[1] - a[1])[0];
+  if (mostCommon && mostCommon[1] >= 3) {
+    const pattern = mostCommon[0].split(',');
+    return pattern[pattern.length - 1] !== last10[last10.length - 1] ? 'Tài' : 'Xỉu';
+  } else if (totalWeight > 0 && Math.abs(taiWeighted - xiuWeighted) / totalWeight >= 0.2) {
+    return taiWeighted > xiuWeighted ? 'Tài' : 'Xỉu';
+  }
+  return last15[last15.length - 1] === 'Xỉu' ? 'Tài' : 'Xỉu';
+}
+
+// Helper function: Short pattern model
+function shortPattern(history) {
+  const { streak, currentResult, breakProb } = detectStreakAndBreak(history);
+  if (streak >= 4) {
+    if (breakProb > 0.7) {
+      return currentResult === 'Tài' ? 'Xỉu' : 'Tài';
+    }
+    return currentResult;
+  }
+  const last8 = history.slice(-8).map(h => h.result);
+  if (!last8.length) return 'Tài';
+  const patterns = [];
+  if (last8.length >= 3) {
+    for (let i = 0; i <= last8.length - 3; i++) {
+      patterns.push(last8.slice(i, i + 3).join(','));
+    }
+  }
+  const patternCounts = patterns.reduce((acc, p) => { acc[p] = (acc[p] || 0) + 1; return acc; }, {});
+  const mostCommon = Object.entries(patternCounts).sort((a, b) => b[1] - a[1])[0];
+  if (mostCommon && mostCommon[1] >= 2) {
+    const pattern = mostCommon[0].split(',');
+    return pattern[pattern.length - 1] !== last8[last8.length - 1] ? 'Tài' : 'Xỉu';
+  }
+  return last8[last8.length - 1] === 'Xỉu' ? 'Tài' : 'Xỉu';
+}
+
+// Helper function: Mean deviation model
+function meanDeviation(history) {
+  const { streak, currentResult, breakProb } = detectStreakAndBreak(history);
+  if (streak >= 4) {
+    if (breakProb > 0.7) {
+      return currentResult === 'Tài' ? 'Xỉu' : 'Tài';
+    }
+    return currentResult;
+  }
+  const last12 = history.slice(-12).map(h => h.result);
+  if (!last12.length) return 'Tài';
+  const taiCount = last12.filter(r => r === 'Tài').length;
+  const xiuCount = last12.length - taiCount;
+  const deviation = Math.abs(taiCount - xiuCount) / last12.length;
+  if (deviation < 0.3) {
+    return last12[last12.length - 1] === 'Xỉu' ? 'Tài' : 'Xỉu';
+  }
+  return xiuCount > taiCount ? 'Tài' : 'Xỉu';
+}
+
+// Helper function: Recent switch model
+function recentSwitch(history) {
+  const { streak, currentResult, breakProb } = detectStreakAndBreak(history);
+  if (streak >= 4) {
+    if (breakProb > 0.7) {
+      return currentResult === 'Tài' ? 'Xỉu' : 'Tài';
+    }
+    return currentResult;
+  }
+  const last10 = history.slice(-10).map(h => h.result);
+  if (!last10.length) return 'Tài';
+  const switches = last10.slice(1).reduce((count, curr, idx) => count + (curr !== last10[idx] ? 1 : 0), 0);
+  return switches >= 5 ? (last10[last10.length - 1] === 'Xỉu' ? 'Tài' : 'Xỉu') : (last10[last10.length - 1] === 'Xỉu' ? 'Tài' : 'Xỉu');
+}
+
+// Helper function: Check bad pattern
+function isBadPattern(history) {
+  const last15 = history.slice(-15).map(h => h.result);
+  if (!last15.length) return false;
+  const switches = last15.slice(1).reduce((count, curr, idx) => count + (curr !== last15[idx] ? 1 : 0), 0);
+  const { streak } = detectStreakAndBreak(history);
+  return switches >= 8 || streak >= 9;
+}
+
+// AI HTDD Logic
+function aiHtddLogic(history) {
+  const recentHistory = history.slice(-6).map(h => h.result);
+  const recentScores = history.slice(-6).map(h => h.totalScore || 0);
+  const taiCount = recentHistory.filter(r => r === 'Tài').length;
+  const xiuCount = recentHistory.filter(r => r === 'Xỉu').length;
+
+  if (history.length >= 6) {
+    const last6 = history.slice(-6).map(h => h.result).join(',');
+    if (last6 === 'Tài,Xỉu,Xỉu,Tài,Tài,Tài') {
+      return { prediction: 'Xỉu', reason: '[AI] Phát hiện mẫu 1T2X3T (Tài, Xỉu, Xỉu, Tài, Tài, Tài) → dự đoán Xỉu', source: 'AI HTDD 123' };
+    } else if (last6 === 'Xỉu,Tài,Tài,Xỉu,Xỉu,Xỉu') {
+      return { prediction: 'Tài', reason: '[AI] Phát hiện mẫu 1X2T3X (Xỉu, Tài, Tài, Xỉu, Xỉu, Xỉu) → dự đoán Tài', source: 'AI HTDD 123' };
+    }
+  }
+  if (history.length >= 3) {
+    const last3 = history.slice(-3).map(h => h.result);
+    if (last3.join(',') === 'Tài,Xỉu,Tài') {
+      return { prediction: 'Xỉu', reason: '[AI] Phát hiện mẫu 1T1X → tiếp theo nên đánh Xỉu', source: 'AI HTDD' };
+    } else if (last3.join(',') === 'Xỉu,Tài,Xỉu') {
+      return { prediction: 'Tài', reason: '[AI] Phát hiện mẫu 1X1T → tiếp theo nên đánh Tài', source: 'AI HTDD' };
+    }
+  }
+
+  if (history.length >= 4) {
+    const last4 = history.slice(-4).map(h => h.result);
+    if (last4.join(',') === 'Tài,Tài,Xỉu,Xỉu') {
+      return { prediction: 'Tài', reason: '[AI] Phát hiện mẫu 2T2X → tiếp theo nên đánh Tài', source: 'AI HTDD' };
+    } else if (last4.join(',') === 'Xỉu,Xỉu,Tài,Tài') {
+      return { prediction: 'Xỉu', reason: '[AI] Phát hiện mẫu 2X2T → tiếp theo nên đánh Xỉu', source: 'AI HTDD' };
+    }
+  }
+
+  if (history.length >= 9 && history.slice(-9).every(h => h.result === 'Xỉu')) {
+    return { prediction: 'Tài', reason: '[AI] Chuỗi Xỉu quá dài (9 lần) → dự đoán Tài', source: 'AI HTDD' };
+  }
+
+  const avgScore = recentScores.reduce((sum, score) => sum + score, 0) / (recentScores.length || 1);
+  if (avgScore > 10) {
+    return { prediction: 'Tài', reason: `[AI] Điểm trung bình cao (${avgScore.toFixed(1)}) → dự đoán Tài`, source: 'AI HTDD' };
+  } else if (avgScore < 8) {
+    return { prediction: 'Xỉu', reason: `[AI] Điểm trung bình thấp (${avgScore.toFixed(1)}) → dự đoán Xỉu`, source: 'AI HTDD' };
+  }
+
+  if (taiCount > xiuCount + 1) {
+    return { prediction: 'Tài', reason: `[AI] Tài chiếm đa số (${taiCount}/${recentHistory.length}) → dự đoán Tài`, source: 'AI HTDD' };
+  } else if (xiuCount > taiCount + 1) {
+    return { prediction: 'Xỉu', reason: `[AI] Xỉu chiếm đa số (${xiuCount}/${recentHistory.length}) → dự đoán Xỉu`, source: 'AI HTDD' };
+  } else {
+    const overallTai = history.filter(h => h.result === 'Tài').length;
+    const overallXiu = history.filter(h => h.result === 'Xỉu').length;
+    if (overallTai > overallXiu) {
+      return { prediction: 'Xỉu', reason: '[AI] Tổng thể Tài nhiều hơn → dự đoán Xỉu', source: 'AI HTDD' };
+    } else {
+      return { prediction: 'Tài', reason: '[AI] Tổng thể Xỉu nhiều hơn hoặc bằng → dự đoán Tài', source: 'AI HTDD' };
+    }
+  }
+}
+
+// Main prediction function
+function generatePrediction(history, modelPredictions) {
+  if (!history || history.length < 5) {
+    console.log('Insufficient history, defaulting to Tài');
+    return 'Tài'; // Default if insufficient data
+  }
+
+  const currentIndex = history[history.length - 1].session;
+
+  // Initialize modelPredictions objects if not exists
+  modelPredictions['trend'] = modelPredictions['trend'] || {};
+  modelPredictions['short'] = modelPredictions['short'] || {};
+  modelPredictions['mean'] = modelPredictions['mean'] || {};
+  modelPredictions['switch'] = modelPredictions['switch'] || {};
+  modelPredictions['bridge'] = modelPredictions['bridge'] || {};
+
+  // Run models
+  const trendPred = trendAndProb(history);
+  const shortPred = shortPattern(history);
+  const meanPred = meanDeviation(history);
+  const switchPred = recentSwitch(history);
+  const bridgePred = smartBridgeBreak(history);
+  const aiPred = aiHtddLogic(history);
+
+  // Store predictions
+  modelPredictions['trend'][currentIndex] = trendPred;
+  modelPredictions['short'][currentIndex] = shortPred;
+  modelPredictions['mean'][currentIndex] = meanPred;
+  modelPredictions['switch'][currentIndex] = switchPred;
+  modelPredictions['bridge'][currentIndex] = bridgePred.prediction;
+
+  // Evaluate model performance
+  const modelScores = {
+    trend: evaluateModelPerformance(history, 'trend'),
+    short: evaluateModelPerformance(history, 'short'),
+    mean: evaluateModelPerformance(history, 'mean'),
+    switch: evaluateModelPerformance(history, 'switch'),
+    bridge: evaluateModelPerformance(history, 'bridge')
+  };
+
+  // Weighted voting
+  const weights = {
+    trend: 0.25 * modelScores.trend,
+    short: 0.2 * modelScores.short,
+    mean: 0.2 * modelScores.mean,
+    switch: 0.15 * modelScores.switch,
+    bridge: 0.2 * modelScores.bridge,
+    aihtdd: 0.3
+  };
+
+  let taiScore = 0;
+  let xiuScore = 0;
+
+  taiScore += (trendPred === 'Tài' ? weights.trend : 0);
+  xiuScore += (trendPred === 'Xỉu' ? weights.trend : 0);
+  taiScore += (shortPred === 'Tài' ? weights.short : 0);
+  xiuScore += (shortPred === 'Xỉu' ? weights.short : 0);
+  taiScore += (meanPred === 'Tài' ? weights.mean : 0);
+  xiuScore += (meanPred === 'Xỉu' ? weights.mean : 0);
+  taiScore += (switchPred === 'Tài' ? weights.switch : 0);
+  xiuScore += (switchPred === 'Xỉu' ? weights.switch : 0);
+  taiScore += (bridgePred.prediction === 'Tài' ? weights.bridge : 0);
+  xiuScore += (bridgePred.prediction === 'Xỉu' ? weights.bridge : 0);
+  taiScore += (aiPred.prediction === 'Tài' ? weights.aihtdd : 0);
+  xiuScore += (aiPred.prediction === 'Xỉu' ? weights.aihtdd : 0);
+
+  // Adjust for bad pattern
+  if (isBadPattern(history)) {
+    console.log('Bad pattern detected, reducing confidence');
+    taiScore *= 0.7;
+    xiuScore *= 0.7;
+  }
+
+  // Adjust for bridge break probability
+  if (bridgePred.breakProb > 0.6) {
+    console.log('High bridge break probability:', bridgePred.breakProb, bridgePred.reason);
+    if (bridgePred.prediction === 'Tài') taiScore += 0.3; else xiuScore += 0.3;
+  }
+
+  const finalPrediction = taiScore > xiuScore ? 'Tài' : 'Xỉu';
+  console.log('Prediction:', { prediction: finalPrediction, reason: `${aiPred.reason} | ${bridgePred.reason}`, scores: { taiScore, xiuScore } });
+  return finalPrediction;
+}
+
+// Export functions (if using module system)
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    detectStreakAndBreak,
+    evaluateModelPerformance,
+    smartBridgeBreak,
+    trendAndProb,
+    shortPattern,
+    meanDeviation,
+    recentSwitch,
+    isBadPattern,
+    aiHtddLogic,
+    generatePrediction
+  };
+}
+  console.log(`🚀 Server Tai Xiu AI đang chạy tại http://localhost:${PORT}/taixiu`);
 });
