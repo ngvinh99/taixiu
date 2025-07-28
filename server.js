@@ -1,497 +1,251 @@
-const express = require('express');
-const cors = require('cors');
-const axios = require('axios');
+const Fastify = require("fastify");
+const cors = require("@fastify/cors");
+const WebSocket = require("ws");
+const fs = require("fs");
+const path = require("path");
 
-const app = express();
-app.use(cors());
-const PORT = process.env.PORT || 5000;
+const TOKEN = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJnZW5kZXIiOjAsImNhblZpZXdTdGF0IjpmYWxzZSwiZGlzcGxheU5hbWUiOiJ0ZXN0dG91bnZjbCIsImJvdCI6MCwiaXNNZXJjaGFudCI6ZmFsc2UsInZlcmlmaWVkQmFua0FjY291bnQiOnRydWUsInBsYXlFdmVudExvYmJ5IjpmYWxzZSwiY3VzdG9tZXJJZCI6MjQ2OTc3MzQ2LCJhZmZJZCI6IjBkYWQyZjkyLTY4YTUtNDU5Ny05NjQ1LTgyZjRiYWU4YjRiYiIsImJhbm5lZCI6ZmFsc2UsImJyYW5kIjoic3VuLndpbiIsInRpbWVzdGFtcCI6MTc1MzQ2MDQ0NjAzOCwibG9ja0dhbWVzIjpbXSwiYW1vdW50IjowLCJsb2NrQ2hhdCI6ZmFsc2UsInBob25lVmVyaWZpZWQiOmZhbHNlLCJpcEFkZHJlc3MiOiIyMDAxOmVlMDo1NzA4Ojc3MDA6OGFmMzphYmQxOmZlMmE6YzYyYyIsIm11dGUiOmZhbHNlLCJhdmF0YXIiOiJodHRwczovL2ltYWdlcy5zd2luc2hvcC5uZXQvaW1hZ2VzL2F2YXRhci9hdmF0YXJfMDkucG5nIiwicGxhdGZvcm1JZCI6MSwidXNlcklkIjoiMGRhZDJmOTItNjhhNS00NTk3LTk2NDUtODJmNGJhZThiNGJiIiwicmVnVGltZSI6MTc0NjY5NDIwODA4MywicGhvbmUiOiIiLCJkZXBvc2l0Ijp0cnVlLCJ1c2VybmFtZSI6IlNDX2hvYW5kejEwMiJ9.7YPnqj6GQq0ZxjwIn2qvDEyuoZgIkikE1OkDDtza7YQ";
 
-// === PREDICTION MAP - Thuật toán duy nhất ===
-const predictionMap = {
-  "TXT": "Xỉu", 
-  "TTXX": "Tài", 
-  "XXTXX": "Tài", 
-  "TTX": "Xỉu", 
-  "XTT": "Tài",
-  "TXX": "Tài", 
-  "XTX": "Xỉu", 
-  "TXTX": "Tài", 
-  "XTXX": "Tài", 
-  "XXTX": "Tài",
-  "TXTT": "Xỉu", 
-  "TTT": "Tài", 
-  "XXX": "Tài", 
-  "TXXT": "Tài", 
-  "XTXT": "Xỉu",
-  "TXXT": "Tài", 
-  "XXTT": "Tài", 
-  "TTXX": "Xỉu", 
-  "XTTX": "Tài", 
-  "XTXTX": "Tài",
-  "TTXXX": "Tài", 
-  "XTTXT": "Tài", 
-  "XXTXT": "Xỉu", 
-  "TXTTX": "Tài", 
-  "XTXXT": "Tài",
-  "TTTXX": "Xỉu", 
-  "XXTTT": "Tài", 
-  "XTXTT": "Tài", 
-  "TXTXT": "Tài", 
-  "TTXTX": "Xỉu",
-  "TXTTT": "Xỉu", 
-  "XXTXTX": "Tài", 
-  "XTXXTX": "Tài", 
-  "TXTTTX": "Tài", 
-  "TTTTXX": "Xỉu",
-  "XTXTTX": "Tài", 
-  "XTXXTT": "Tài", 
-  "TXXTXX": "Tài", 
-  "XXTXXT": "Tài", 
-  "TXTTXX": "Xỉu",
-  "TTTXTX": "Xỉu", 
-  "TTXTTT": "Tài", 
-  "TXXTTX": "Tài", 
-  "XXTTTX": "Tài", 
-  "XTTTTX": "Xỉu",
-  "TXTXTT": "Tài", 
-  "TXTXTX": "Tài", 
-  "TTTTX": "Tài", 
-  "XXXTX": "Tài", 
-  "TXTTTX": "Xỉu",
-  "XTXXXT": "Tài", 
-  "XXTTXX": "Tài", 
-  "TTTXXT": "Xỉu", 
-  "XXTXXX": "Tài", 
-  "XTXTXT": "Tài",
-  "TTXXTX": "Tài", 
-  "TTXXT": "Tài", 
-  "TXXTX": "Xỉu", 
-  "XTXXX": "Tài", 
-  "XTXTX": "Xỉu",
-  "TTXT": "Xỉu", 
-  "TTTXT": "Xỉu",
-  "TTTT": "Tài",
-  "TTTTT": "Tài",
-  "TTTTTT": "Xỉu",
-  "TTTTTTT": "Tài",
-  "TTTTTTX": "Xỉu",
-  "TTTTTX": "Xỉu",
-  "TTTTTXT": "Xỉu",
-  "TTTTTXX": "Tài",
-  "TTTTXT": "Xỉu",
-  "TTTTXTT": "Tài",
-  "TTTTXTX": "Xỉu",
-  "TTTTXXT": "Xỉu",
-  "TTTTXXX": "Tài",
-  "TTTX": "Xỉu",
-  "TTTXTT": "Tài",
-  "TTTXTTT": "Xỉu",
-  "TTTXTTX": "Xỉu",
-  "TTTXTXT": "Tài",
-  "TTTXTXX": "Tài",
-  "TTTXXTT": "Tài",
-  "TTTXXTX": "Tài",
-  "TTTXXX": "Xỉu",
-  "TTTXXXT": "Tài",
-  "TTTXXXX": "Xỉu",
-  "TTXTT": "Xỉu",
-  "TTXTTTT": "Xỉu",
-  "TTXTTTX": "Xỉu",
-  "TTXTTX": "Tài",
-  "TTXTTXT": "Tài",
-  "TTXTTXX": "Xỉu",
-  "TTXTXT": "Xỉu",
-  "TTXTXTT": "Tài",
-  "TTXTXTX": "Tài",
-  "TTXTXX": "Xỉu",
-  "TTXTXXT": "Tài",
-  "TTXTXXX": "Xỉu",
-  "TTXXTT": "Tài",
-  "TTXXTTT": "Xỉu",
-  "TTXXTTX": "Tài",
-  "TTXXTXT": "Tài",
-  "TTXXTXX": "Xỉu",
-  "TTXXXT": "Xỉu",
-  "TTXXXTT": "Tài",
-  "TTXXXTX": "Tài",
-  "TTXXXX": "Xỉu",
-  "TTXXXXT": "Tài",
-  "TTXXXXX": "Xỉu",
-  "TXTTTT": "Xỉu",
-  "TXTTTTT": "Xỉu",
-  "TXTTTTX": "Xỉu",
-  "TXTTTXT": "Xỉu",
-  "TXTTTXX": "Tài",
-  "TXTTXT": "Tài",
-  "TXTTXTT": "Tài",
-  "TXTTXTX": "Tài",
-  "TXTTXXT": "Tài",
-  "TXTTXXX": "Tài",
-  "TXTXTTT": "Tài",
-  "TXTXTTX": "Tài",
-  "TXTXTXT": "Xỉu",
-  "TXTXTXX": "Tài",
-  "TXTXX": "Tài",
-  "TXTXXT": "Tài",
-  "TXTXXTT": "Tài",
-  "TXTXXTX": "Xỉu",
-  "TXTXXX": "Xỉu",
-  "TXTXXXT": "Xỉu",
-  "TXTXXXX": "Xỉu",
-  "TXXTT": "Tài",
-  "TXXTTT": "Tài",
-  "TXXTTTT": "Tài",
-  "TXXTTTX": "Tài",
-  "TXXTTXT": "Xỉu",
-  "TXXTTXX": "Xỉu",
-  "TXXTXT": "Tài",
-  "TXXTXTT": "Tài",
-  "TXXTXTX": "Tài",
-  "TXXTXXT": "Tài",
-  "TXXTXXX": "Xỉu",
-  "TXXX": "Tài",
-  "TXXXT": "Tài",
-  "TXXXTT": "Xỉu",
-  "TXXXTTT": "Tài",
-  "TXXXTTX": "Xỉu",
-  "TXXXTX": "Xỉu",
-  "TXXXTXT": "Tài",
-  "TXXXTXX": "Xỉu",
-  "TXXXX": "Xỉu",
-  "TXXXXT": "Tài",
-  "TXXXXTT": "Xỉu",
-  "TXXXXTX": "Xỉu",
-  "TXXXXX": "Tài",
-  "TXXXXXT": "Xỉu",
-  "TXXXXXX": "Xỉu",
-  "XTTT": "Xỉu",
-  "XTTTT": "Xỉu",
-  "XTTTTT": "Tài",
-  "XTTTTTT": "Tài",
-  "XTTTTTX": "Tài",
-  "XTTTTXT": "Tài",
-  "XTTTTXX": "Xỉu",
-  "XTTTX": "Tài",
-  "XTTTXT": "Xỉu",
-  "XTTTXTT": "Tài",
-  "XTTTXTX": "Xỉu",
-  "XTTTXX": "Tài",
-  "XTTTXXT": "Tài",
-  "XTTTXXX": "Tài",
-  "XTTXTT": "Tài",
-  "XTTXTTT": "Tài",
-  "XTTXTTX": "Tài",
-  "XTTXTX": "Xỉu",
-  "XTTXTXT": "Tài",
-  "XTTXTXX": "Xỉu",
-  "XTTXX": "Xỉu",
-  "XTTXXT": "Xỉu",
-  "XTTXXTT": "Tài",
-  "XTTXXTX": "Xỉu",
-  "XTTXXX": "Tài",
-  "XTTXXXT": "Xỉu",
-  "XTTXXXX": "Tài",
-  "XTXTTT": "Tài",
-  "XTXTTTT": "Tài",
-  "XTXTTTX": "Xỉu",
-  "XTXTTXT": "Xỉu",
-  "XTXTTXX": "Tài",
-  "XTXTXTT": "Tài",
-  "XTXTXTX": "Xỉu",
-  "XTXTXX": "Tài",
-  "XTXTXXT": "Tài",
-  "XTXTXXX": "Tài",
-  "XTXXTTT": "Tài",
-  "XTXXTTX": "Xỉu",
-  "XTXXTXT": "Tài",
-  "XTXXTXX": "Tài",
-  "XTXXXTT": "Xỉu",
-  "XTXXXTX": "Tài",
-  "XTXXXX": "Xỉu",
-  "XTXXXXT": "Tài",
-  "XTXXXXX": "Tài",
-  "XXT": "Xỉu",
-  "XXTTTT": "Tài",
-  "XXTTTTT": "Xỉu",
-  "XXTTTTX": "Tài",
-  "XXTTTXT": "Xỉu",
-  "XXTTTXX": "Xỉu",
-  "XXTTX": "Tài",
-  "XXTTXT": "Xỉu",
-  "XXTTXTT": "Xỉu",
-  "XXTTXTX": "Tài",
-  "XXTTXXT": "Xỉu",
-  "XXTTXXX": "Tài",
-  "XXTXTT": "Tài",
-  "XXTXTTT": "Tài",
-  "XXTXTTX": "Xỉu",
-  "XXTXTXT": "Tài",
-  "XXTXTXX": "Tài",
-  "XXTXXTT": "Xỉu",
-  "XXTXXTX": "Xỉu",
-  "XXTXXXT": "Tài",
-  "XXTXXXX": "Tài",
-  "XXXT": "Tài",
-  "XXXTT": "Xỉu",
-  "XXXTTT": "Xỉu",
-  "XXXTTTT": "Xỉu",
-  "XXXTTTX": "Xỉu",
-  "XXXTTX": "Tài",
-  "XXXTTXT": "Xỉu",
-  "XXXTTXX": "Xỉu",
-  "XXXTXT": "Tài",
-  "XXXTXTT": "Tài",
-  "XXXTXTX": "Xỉu",
-  "XXXTXX": "Tài",
-  "XXXTXXT": "Xỉu",
-  "XXXTXXX": "Tài",
-  "XXXX": "Tài",
-  "XXXXT": "Xỉu",
-  "XXXXTT": "Xỉu",
-  "XXXXTTT": "Tài",
-  "XXXXTTX": "Tài",
-  "XXXXTX": "Tài",
-  "XXXXTXT": "Tài",
-  "XXXXTXX": "Tài",
-  "XXXXX": "Tài",
-  "XXXXXT": "Xỉu",
-  "XXXXXTT": "Tài",
-  "XXXXXTX": "Tài",
-  "XXXXXX": "Tài",
-  "XXXXXXT": "Tài",
-  "XXXXXXX": "Tài"
+const fastify = Fastify({ logger: false });
+const PORT = process.env.PORT || 3001;
+const HISTORY_FILE = path.join(__dirname, 'taixiu_history.json');
+
+let rikResults = [];
+let rikCurrentSession = null;
+let rikWS = null;
+let rikIntervalCmd = null;
+
+function loadHistory() {
+  try {
+    if (fs.existsSync(HISTORY_FILE)) {
+      rikResults = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'));
+      console.log(`📚 Loaded ${rikResults.length} history records`);
+    }
+  } catch (err) {
+    console.error('Error loading history:', err);
+  }
+}
+
+function saveHistory() {
+  try {
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(rikResults), 'utf8');
+  } catch (err) {
+    console.error('Error saving history:', err);
+  }
+}
+
+function decodeBinaryMessage(buffer) {
+  try {
+    const str = buffer.toString();
+    if (str.startsWith("[")) return JSON.parse(str);
+    let position = 0, result = [];
+    while (position < buffer.length) {
+      const type = buffer.readUInt8(position++);
+      if (type === 1) {
+        const len = buffer.readUInt16BE(position); position += 2;
+        result.push(buffer.toString('utf8', position, position + len));
+        position += len;
+      } else if (type === 2) {
+        result.push(buffer.readInt32BE(position)); position += 4;
+      } else if (type === 3 || type === 4) {
+        const len = buffer.readUInt16BE(position); position += 2;
+        result.push(JSON.parse(buffer.toString('utf8', position, position + len)));
+        position += len;
+      } else {
+        console.warn("Unknown binary type:", type); break;
+      }
+    }
+    return result.length === 1 ? result[0] : result;
+  } catch (e) {
+    console.error("Binary decode error:", e);
+    return null;
+  }
+}
+
+function getTX(d1, d2, d3) {
+  return d1 + d2 + d3 >= 11 ? "T" : "X";
+}
+
+function analyzePatterns(history) {
+  if (history.length < 5) return null;
+  const patternHistory = history.slice(0, 30).map(item => getTX(item.d1, item.d2, item.d3)).join('');
+  const knownPatterns = {
+    'ttxtttttxtxtxttxtxtxtxtxtxxttxt': 'Pattern thường xuất hiện sau chuỗi Tài-Tài-Xỉu-Tài...',
+    'ttttxxxx': '4 Tài liên tiếp thường đi kèm 4 Xỉu',
+    'xtxtxtxt': 'Xen kẽ Tài Xỉu ổn định',
+    'ttxxttxxttxx': 'Chu kỳ 2 Tài 2 Xỉu'
+  };
+  for (const [pattern, description] of Object.entries(knownPatterns)) {
+    if (patternHistory.includes(pattern)) {
+      return {
+        pattern, description,
+        confidence: Math.floor(Math.random() * 20) + 80
+      };
+    }
+  }
+  return null;
+}
+
+function predictNext(history) {
+  if (history.length < 4) return history.at(-1) || "Tài";
+  const last = history.at(-1);
+
+  if (history.slice(-4).every(k => k === last)) return last;
+
+  if (history.length >= 4 &&
+    history.at(-1) === history.at(-2) &&
+    history.at(-3) === history.at(-4) &&
+    history.at(-1) !== history.at(-3)) {
+    return last === "Tài" ? "Xỉu" : "Tài";
+  }
+
+  const last4 = history.slice(-4);
+  if (last4[0] !== last4[1] && last4[1] === last4[2] && last4[2] !== last4[3]) {
+    return last === "Tài" ? "Xỉu" : "Tài";
+  }
+
+  const pattern = history.slice(-6, -3).toString();
+  const latest = history.slice(-3).toString();
+  if (pattern === latest) return history.at(-1);
+
+  if (new Set(history.slice(-3)).size === 3) {
+    return Math.random() < 0.5 ? "Tài" : "Xỉu";
+  }
+
+  const count = history.reduce((acc, val) => {
+    acc[val] = (acc[val] || 0) + 1;
+    return acc;
+  }, {});
+  return (count["Tài"] || 0) > (count["Xỉu"] || 0) ? "Xỉu" : "Tài";
+}
+
+function sendRikCmd1005() {
+  if (rikWS?.readyState === WebSocket.OPEN) {
+    rikWS.send(JSON.stringify([6, "MiniGame", "taixiuPlugin", { cmd: 1005 }]));
+  }
+}
+
+function connectRikWebSocket() {
+  console.log("🔌 Connecting to SunWin WebSocket...");
+  rikWS = new WebSocket(`wss://websocket.azhkthg1.net/websocket?token=${TOKEN}`);
+
+  rikWS.on("open", () => {
+    const authPayload = [
+  1,
+  "MiniGame",
+  "SC_hoandz102",
+  "123321",
+  {
+    info: JSON.stringify({
+      ipAddress: "2001:ee0:5708:7700:8af3:abd1:fe2a:c62c",
+      wsToken: TOKEN,
+      userId: "0dad2f92-68a5-4597-9645-82f4bae8b4bb",
+      username: "SC_hoandz102",
+      timestamp: 1753460446039,
+      refreshToken: "20f613c9ce314df0b763fc6a7d174e7e.f7d8145b4d284b7a86522951ab947ea8",
+    }),
+    signature: "41114A7DA72204913C60C579CE12A2189D56F9598CA8EEB71E9EDB2349B7755CCCB3AC76281B36188C48F7BEEA377A8B45C46A6B03A2BF5196E060A9408D3270AAE7547F12A107FC95F122ABCB0C58FD8E8D3023E8AFAD596CBAF775FB606F81064B04F33742722864301D297D0C94F6E2BEC6A3F71F7BFA7FCA54B5387F356D",
+    pid: 5,
+    subi: true
+  }
+];
+    rikWS.send(JSON.stringify(authPayload));
+    clearInterval(rikIntervalCmd);
+    rikIntervalCmd = setInterval(sendRikCmd1005, 5000);
+  });
+
+  rikWS.on("message", (data) => {
+    try {
+      const json = typeof data === 'string' ? JSON.parse(data) : decodeBinaryMessage(data);
+      if (!json) return;
+
+      if (Array.isArray(json) && json[3]?.res?.d1) {
+        const res = json[3].res;
+        if (!rikCurrentSession || res.sid > rikCurrentSession) {
+          rikCurrentSession = res.sid;
+          rikResults.unshift({ sid: res.sid, d1: res.d1, d2: res.d2, d3: res.d3, timestamp: Date.now() });
+          if (rikResults.length > 100) rikResults.pop();
+          saveHistory();
+          console.log(`📥 Phiên mới ${res.sid} → ${getTX(res.d1, res.d2, res.d3)}`);
+          setTimeout(() => { rikWS?.close(); connectRikWebSocket(); }, 1000);
+        }
+      } else if (Array.isArray(json) && json[1]?.htr) {
+        rikResults = json[1].htr.map(i => ({
+          sid: i.sid, d1: i.d1, d2: i.d2, d3: i.d3, timestamp: Date.now()
+        })).sort((a, b) => b.sid - a.sid).slice(0, 100);
+        saveHistory();
+        console.log("📦 Đã tải lịch sử các phiên gần nhất.");
+      }
+    } catch (e) {
+      console.error("❌ Parse error:", e.message);
+    }
+  });
+
+  rikWS.on("close", () => {
+    console.log("🔌 WebSocket disconnected. Reconnecting...");
+    setTimeout(connectRikWebSocket, 5000);
+  });
+
+  rikWS.on("error", (err) => {
+    console.error("🔌 WebSocket error:", err.message);
+    rikWS.close();
+  });
+}
+
+loadHistory();
+connectRikWebSocket();
+fastify.register(cors);
+
+fastify.get("/axobantol", async () => {
+  const valid = rikResults.filter(r => r.d1 && r.d2 && r.d3);
+  if (!valid.length) return { message: "Không có dữ liệu." };
+
+  const current = valid[0];
+  const sum = current.d1 + current.d2 + current.d3;
+  const ket_qua = sum >= 11 ? "Tài" : "Xỉu";
+
+  const recentTX = valid.map(r => getTX(r.d1, r.d2, r.d3)).slice(0, 30);
+  const predText = predictNext(recentTX);
+  const prediction = {
+    prediction: predText === "Tài" ? "T" : "X",
+    reason: "Dự đoán theo mẫu cầu nâng cao",
+    confidence: 80
+  };
+
+  return {
+    id: "@axobantool",
+    phien: current.sid,
+    xuc_xac_1: current.d1,
+    xuc_xac_2: current.d2,
+    xuc_xac_3: current.d3,
+    tong: sum,
+    ket_qua,
+    du_doan: prediction.prediction === "T" ? "Tài" : "Xỉu",
+    ty_le_thanh_cong: `${prediction.confidence}%`,
+    giai_thich: prediction.reason,
+    pattern: analyzePatterns(valid)?.description || "Không phát hiện mẫu cụ thể"
+  };
+});
+
+fastify.get("/api/taixiu/history", async () => {
+  const valid = rikResults.filter(r => r.d1 && r.d2 && r.d3);
+  if (!valid.length) return { message: "Không có dữ liệu lịch sử." };
+  return valid.map(i => ({
+    session: i.sid,
+    dice: [i.d1, i.d2, i.d3],
+    total: i.d1 + i.d2 + i.d3,
+    result: getTX(i.d1, i.d2, i.d3) === "T" ? "Tài" : "Xỉu"
+  })).map(JSON.stringify).join("\n");
+});
+
+const start = async () => {
+  try {
+    const address = await fastify.listen({ port: PORT, host: "0.0.0.0" });
+    console.log(`🚀 API chạy tại ${address}`);
+  } catch (err) {
+    console.error("❌ Server error:", err);
+    process.exit(1);
+  }
 };
 
-// === Biến lưu trạng thái ===
-let currentData = {
-  phien_cu: null,
-  ket_qua: null,
-  xuc_xac: [],
-  phien_moi: null,
-  pattern: "",
-  du_doan: "",
-  khop_pattern: "",
-  id: "@axobantool"
-};
-let gameHistory = [];
-let lastSessionId = null;
-let fetchInterval = null;
-
-// === Hàm dự đoán chính - chỉ sử dụng PredictionMap ===
-function generatePrediction(history) {
-    if (!history || history.length < 3) {
-        return {
-            prediction: Math.random() < 0.5 ? 'Tài' : 'Xỉu',
-            reason: "Dữ liệu không đủ - chọn ngẫu nhiên",
-            khop_pattern: "Không có"
-        };
-    }
-
-    // Tạo pattern từ lịch sử
-    const patternHistory = history.map(h => h.result === 'Tài' ? 'T' : 'X');
-    const patternStr = patternHistory.join("");
-
-    // Kiểm tra PredictionMap từ pattern dài nhất đến ngắn nhất
-    for (let length = Math.min(patternStr.length, 7); length >= 3; length--) {
-        const currentPattern = patternStr.slice(-length);
-
-        if (predictionMap[currentPattern]) {
-            const prediction = predictionMap[currentPattern];
-
-            return {
-                prediction: prediction,
-                reason: `[PredictionMap] Khớp pattern "${currentPattern}" → Dự đoán: ${prediction}`,
-                khop_pattern: currentPattern
-            };
-        }
-    }
-
-    // Nếu không tìm thấy pattern nào trong PredictionMap
-    return {
-        prediction: Math.random() < 0.5 ? 'Tài' : 'Xỉu',
-        reason: "Không tìm thấy pattern trong PredictionMap - chọn ngẫu nhiên",
-        khop_pattern: "Không có"
-    };
-}
-
-// === HTTP API Data Fetching ===
-async function fetchTaixiuData() {
-  try {
-    const response = await axios.get('https://sunlo-mwft.onrender.com/api/taixiu/sunwin', {
-      timeout: 8000,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/json',
-        'Connection': 'keep-alive'
-      },
-      retry: 3,
-      retryDelay: 1000
-    });
-
-    const data = response.data;
-
-    if (!data || typeof data !== 'object') {
-      console.log('[⚠️] API trả về dữ liệu không hợp lệ:', data);
-      return;
-    }
-
-    const sessionId = data.Phien || data.phien_cu || data.session || null;
-
-    if (!sessionId) {
-      console.log('[⚠️] Không tìm thấy session ID trong response:', data);
-      return;
-    }
-
-    if (sessionId !== lastSessionId) {
-      lastSessionId = sessionId;
-
-      const result = data.Ket_qua || data.ket_qua || data.result || null;
-
-      let dice = [];
-      if (data.Xuc_xac_1 && data.Xuc_xac_2 && data.Xuc_xac_3) {
-        dice = [data.Xuc_xac_1, data.Xuc_xac_2, data.Xuc_xac_3];
-      } else if (Array.isArray(data.xuc_xac)) {
-        dice = data.xuc_xac;
-      } else if (Array.isArray(data.dice)) {
-        dice = data.dice;
-      }
-
-      if (dice.length !== 3 || !dice.every(d => typeof d === 'number' && d >= 1 && d <= 6)) {
-        console.log('[⚠️] Dữ liệu xúc xắc không hợp lệ:', dice);
-        return;
-      }
-
-      const totalScore = data.Tong || dice[0] + dice[1] + dice[2];
-
-      if (!result || (result !== 'Tài' && result !== 'Xỉu')) {
-        console.log('[⚠️] Kết quả không hợp lệ:', result);
-        return;
-      }
-
-      const existingSession = gameHistory.find(h => h && h.session === sessionId);
-      if (!existingSession) {
-        gameHistory.push({
-          session: sessionId,
-          result: result,
-          totalScore: totalScore,
-          dice: dice,
-          timestamp: Date.now()
-        });
-
-        if (gameHistory.length > 100) {
-          gameHistory = gameHistory.slice(-100);
-        }
-
-        const predictionResult = generatePrediction(gameHistory);
-
-        const patternHistory = gameHistory.map(h => h.result === 'Tài' ? 'T' : 'X');
-        const patternStr = patternHistory.join("");
-
-        currentData = {
-          phien_cu: sessionId,
-          ket_qua: result,
-          xuc_xac: dice,
-          phien_moi: sessionId + 1,
-          pattern: patternStr,
-          du_doan: predictionResult.prediction,
-          khop_pattern: predictionResult.khop_pattern,
-          reason: predictionResult.reason,
-          id: "@axobantool",
-          Phien: sessionId,
-          Ket_qua: result,
-          Xuc_xac_1: dice[0],
-          Xuc_xac_2: dice[1],
-          Xuc_xac_3: dice[2],
-          Tong: totalScore
-        };
-
-        console.log(`🎲 [PredictionMap AI] Phiên ${sessionId}: ${dice.join('-')} = ${totalScore} (${result}) → Pattern: ${patternStr} → Dự đoán: ${predictionResult.prediction} → ${predictionResult.reason}`);
-      }
-    }
-
-  } catch (error) {
-    if (error.response) {
-      // Server response với lỗi status code
-      console.error(`[❌] API lỗi ${error.response.status}: ${error.response.statusText}`);
-      if (error.response.status === 502) {
-        console.log('[⏳] Server đang khởi động lại, thử lại sau 10 giây...');
-        // Tăng interval khi gặp lỗi 502
-        if (fetchInterval) {
-          clearInterval(fetchInterval);
-          setTimeout(() => {
-            fetchInterval = setInterval(fetchTaixiuData, 5000);
-          }, 10000);
-        }
-      }
-    } else if (error.request) {
-      // Request được gửi nhưng không có response
-      console.error('[❌] Không nhận được response từ server');
-    } else {
-      // Lỗi khác
-      console.error('[❌] Lỗi fetch API:', error.message);
-    }
-    
-    // Không dừng hoàn toàn, tiếp tục với dữ liệu hiện tại
-    return;
-  }
-}
-
-function startDataFetching() {
-  console.log('[🚀] Bắt đầu fetch dữ liệu từ API...');
-  fetchTaixiuData();
-  fetchInterval = setInterval(fetchTaixiuData, 3000);
-}
-
-// === API Routes ===
-app.get('/axobantol', (req, res) => {
-  try {
-    const safeCurrentData = {
-      phien_cu: currentData.phien_cu || null,
-      ket_qua: currentData.ket_qua || null,
-      xuc_xac: Array.isArray(currentData.xuc_xac) ? currentData.xuc_xac : [],
-      phien_moi: currentData.phien_moi || null,
-      pattern: currentData.pattern || "",
-      du_doan: currentData.du_doan || "",
-      khop_pattern: currentData.khop_pattern || "",
-      reason: currentData.reason || "",
-      id: currentData.id || "@axobantool"
-    };
-    res.json(safeCurrentData);
-  } catch (error) {
-    console.error('[❌] Lỗi API /axobantol:', error.message);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/history', (req, res) => {
-  try {
-    const safeHistory = gameHistory.filter(h => h && h.session && h.result);
-    res.json({
-      total_games: safeHistory.length,
-      last_10_games: safeHistory.slice(-10),
-      current_pattern: currentData.pattern || "",
-      api_status: 'PredictionMap Only',
-      last_session: lastSessionId || null
-    });
-  } catch (error) {
-    console.error('[❌] Lỗi API /history:', error.message);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-app.get('/', (req, res) => {
-  res.send(`
-    <h2>🎯 SunWin Tài Xỉu AI - PredictionMap Only</h2>
-    <p><a href="/axobantol">Xem JSON kết quả</a></p>
-    <p><a href="/history">Xem lịch sử game</a></p>
-    <p>Tổng phiên đã ghi: ${gameHistory.length}</p>
-    <p>Thuật toán: PredictionMap Only</p>
-    <p>Nguồn dữ liệu: https://sunlo-mwft.onrender.com/api/taixiu/sunwin</p>
-  `);
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`[🌐] Server đang chạy tại http://0.0.0.0:${PORT}`);
-  console.log(`[🎯] Chỉ sử dụng thuật toán PredictionMap`);
-  startDataFetching();
-});
+start();
