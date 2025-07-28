@@ -213,17 +213,12 @@ fastify.get("/axobantol", async () => {
   };
 
   return {
-    id: "@axobantool",
     phien: current.sid,
     xuc_xac_1: current.d1,
     xuc_xac_2: current.d2,
     xuc_xac_3: current.d3,
-    tong: sum,
     ket_qua,
-    du_doan: prediction.prediction === "T" ? "Tài" : "Xỉu",
-    ty_le_thanh_cong: `${prediction.confidence}%`,
-    giai_thich: prediction.reason,
-    pattern: analyzePatterns(valid)?.description || "Không phát hiện mẫu cụ thể"
+    id: "@axobantool",
   };
 });
 
