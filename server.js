@@ -317,11 +317,15 @@ function generatePrediction(history) {
 // === HTTP API Data Fetching ===
 async function fetchTaixiuData() {
   try {
-    const response = await axios.get('https://taixiu-csly.onrender.com/axobantol', {
-      timeout: 10000,
+    const response = await axios.get('https://sunlo-mwft.onrender.com/api/taixiu/sunwin', {
+      timeout: 8000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'application/json',
+        'Connection': 'keep-alive'
+      },
+      retry: 3,
+      retryDelay: 1000
     });
 
     const data = response.data;
@@ -406,7 +410,29 @@ async function fetchTaixiuData() {
     }
 
   } catch (error) {
-    console.error('[❌] Lỗi fetch API:', error.message);
+    if (error.response) {
+      // Server response với lỗi status code
+      console.error(`[❌] API lỗi ${error.response.status}: ${error.response.statusText}`);
+      if (error.response.status === 502) {
+        console.log('[⏳] Server đang khởi động lại, thử lại sau 10 giây...');
+        // Tăng interval khi gặp lỗi 502
+        if (fetchInterval) {
+          clearInterval(fetchInterval);
+          setTimeout(() => {
+            fetchInterval = setInterval(fetchTaixiuData, 5000);
+          }, 10000);
+        }
+      }
+    } else if (error.request) {
+      // Request được gửi nhưng không có response
+      console.error('[❌] Không nhận được response từ server');
+    } else {
+      // Lỗi khác
+      console.error('[❌] Lỗi fetch API:', error.message);
+    }
+    
+    // Không dừng hoàn toàn, tiếp tục với dữ liệu hiện tại
+    return;
   }
 }
 
@@ -460,7 +486,7 @@ app.get('/', (req, res) => {
     <p><a href="/history">Xem lịch sử game</a></p>
     <p>Tổng phiên đã ghi: ${gameHistory.length}</p>
     <p>Thuật toán: PredictionMap Only</p>
-    <p>Nguồn dữ liệu: https://hit-kyy9.onrender.com/api/hit</p>
+    <p>Nguồn dữ liệu: https://sunlo-mwft.onrender.com/api/taixiu/sunwin</p>
   `);
 });
 
