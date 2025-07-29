@@ -1,15 +1,13 @@
 const express = require('express');
-const axios = require('axios');
 const cors = require('cors');
+const axios = require('axios');
 
 const app = express();
 app.use(cors());
-
 const PORT = process.env.PORT || 5000;
-const MAX_PATTERN_LENGTH = 10;
-const MAX_HISTORY = 100;
 
-let patternMap = {
+// === PREDICTION MAP - hỗ trợ pattern dài tới 10 ký tự ===
+const predictionMap = {
   "TXT": "Xỉu", 
   "TTXX": "Tài", 
   "XXTXX": "Tài", 
@@ -262,91 +260,190 @@ let patternMap = {
   "XXXXXX": "Tài",
   "XXXXXXT": "Tài",
   "XXXXXXX": "Tài"
-};  // Dạng { 'TTXXTTXXXT': 'X' }
-let gameHistory = []; // [{result: 'T', session: 123, dice: [1,2,3]}]
+};
+
+// === Biến lưu trạng thái ===
+let currentData = {
+  phien_cu: null,
+  ket_qua: null,
+  xuc_xac: [],
+  phien_moi: null,
+  pattern: "",
+  du_doan: "",
+  khop_pattern: "",
+  id: "@axobantool"
+};
+let gameHistory = [];
 let lastSessionId = null;
-let currentData = {};
+let fetchInterval = null;
 
-async function fetchData() {
+// === Hàm dự đoán chính - kiểm tra pattern tối đa 10 ký tự ===
+function generatePrediction(history) {
+  if (!history || history.length < 3) {
+    return {
+      prediction: Math.random() < 0.5 ? 'Tài' : 'Xỉu',
+      reason: "Dữ liệu không đủ - chọn ngẫu nhiên",
+      khop_pattern: "Không có"
+    };
+  }
+
+  const patternHistory = history.map(h => h.result === 'Tài' ? 'T' : 'X');
+  const patternStr = patternHistory.join("");
+
+  for (let length = Math.min(patternStr.length, 10); length >= 3; length--) {
+    const currentPattern = patternStr.slice(-length);
+    if (predictionMap[currentPattern]) {
+      return {
+        prediction: predictionMap[currentPattern],
+        reason: `[PredictionMap] Khớp pattern "${currentPattern}" → Dự đoán: ${predictionMap[currentPattern]}`,
+        khop_pattern: currentPattern
+      };
+    }
+  }
+
+  return {
+    prediction: Math.random() < 0.5 ? 'Tài' : 'Xỉu',
+    reason: "Không tìm thấy pattern trong PredictionMap - chọn ngẫu nhiên",
+    khop_pattern: "Không có"
+  };
+}
+
+// === HTTP API Data Fetching ===
+async function fetchTaixiuData() {
   try {
-    const res = await axios.get('https://sunlo-2dfb.onrender.com/api/taixiu/sunwin');
-    const data = res.data;
+    const response = await axios.get('https://sunlo-2dfb.onrender.com/api/taixiu/sunwin', {
+      timeout: 8000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Accept': 'application/json',
+        'Connection': 'keep-alive'
+      }
+    });
 
-    const sessionId = data.Phien || data.session || data.phien_cu;
+    const data = response.data;
+    const sessionId = data.Phien || data.phien_cu || data.session || null;
+
     if (!sessionId || sessionId === lastSessionId) return;
 
-    const dice = [
-      data.Xuc_xac_1,
-      data.Xuc_xac_2,
-      data.Xuc_xac_3
-    ].map(Number);
+    const result = data.Ket_qua || data.ket_qua || data.result || null;
+    let dice = [];
 
-    const total = dice.reduce((a, b) => a + b, 0);
-    const result = total >= 11 ? 'T' : 'X'; // Tài: >=11, Xỉu: <=10
-
-    // Thêm vào lịch sử nếu là phiên mới
-    gameHistory.push({ session: sessionId, result, dice });
-    if (gameHistory.length > MAX_HISTORY) {
-      gameHistory = gameHistory.slice(-MAX_HISTORY);
+    if (data.Xuc_xac_1 && data.Xuc_xac_2 && data.Xuc_xac_3) {
+      dice = [data.Xuc_xac_1, data.Xuc_xac_2, data.Xuc_xac_3];
+    } else if (Array.isArray(data.xuc_xac)) {
+      dice = data.xuc_xac;
+    } else if (Array.isArray(data.dice)) {
+      dice = data.dice;
     }
 
-    // Update patternMap nếu đủ dữ liệu
-    if (gameHistory.length >= MAX_PATTERN_LENGTH + 1) {
-      const recent = gameHistory.slice(-MAX_PATTERN_LENGTH - 1);
-      const pattern = recent.slice(0, MAX_PATTERN_LENGTH).map(x => x.result).join('');
-      const nextResult = recent[MAX_PATTERN_LENGTH].result;
-      patternMap[pattern] = nextResult; // Ghi lại kết quả tiếp theo
-    }
+    if (dice.length !== 3 || !dice.every(d => typeof d === 'number')) return;
 
-    // Tạo pattern hiện tại để dự đoán
-    const recentPattern = gameHistory.slice(-MAX_PATTERN_LENGTH).map(x => x.result).join('');
-    const prediction = patternMap[recentPattern] || (Math.random() < 0.5 ? 'T' : 'X');
-
-    currentData = {
-      sessionId,
-      dice,
-      total,
-      result: result === 'T' ? 'Tài' : 'Xỉu',
-      pattern: recentPattern,
-      prediction: prediction === 'T' ? 'Tài' : 'Xỉu',
-      khop_pattern: recentPattern,
-      source: "@axobantool"
-    };
+    const totalScore = data.Tong || dice.reduce((a, b) => a + b, 0);
+    if (!result || (result !== 'Tài' && result !== 'Xỉu')) return;
 
     lastSessionId = sessionId;
-    console.log(`✅ Phiên ${sessionId} | ${dice.join('-')} = ${total} → ${result === 'T' ? 'Tài' : 'Xỉu'} | Pattern: ${recentPattern} → Dự đoán: ${currentData.prediction}`);
-  } catch (err) {
-    console.error('[Lỗi API]', err.message);
+
+    gameHistory.push({
+      session: sessionId,
+      result,
+      totalScore,
+      dice,
+      timestamp: Date.now()
+    });
+    if (gameHistory.length > 100) gameHistory = gameHistory.slice(-100);
+
+    const predictionResult = generatePrediction(gameHistory);
+    const patternHistory = gameHistory.map(h => h.result === 'Tài' ? 'T' : 'X').join("");
+
+    currentData = {
+      phien_cu: sessionId,
+      ket_qua: result,
+      xuc_xac: dice,
+      phien_moi: sessionId + 1,
+      pattern: patternHistory,
+      du_doan: predictionResult.prediction,
+      khop_pattern: predictionResult.khop_pattern,
+      reason: predictionResult.reason,
+      id: "@axobantool",
+      Phien: sessionId,
+      Ket_qua: result,
+      Xuc_xac_1: dice[0],
+      Xuc_xac_2: dice[1],
+      Xuc_xac_3: dice[2],
+      Tong: totalScore
+    };
+
+    console.log(`🎲 [PredictionMap AI] Phiên ${sessionId}: ${dice.join('-')} = ${totalScore} (${result}) → Pattern: ${patternHistory} → Dự đoán: ${predictionResult.prediction} → ${predictionResult.reason}`);
+  } catch (error) {
+    if (error.response) {
+      console.error(`[❌] API lỗi ${error.response.status}: ${error.response.statusText}`);
+      if (error.response.status === 502 && fetchInterval) {
+        clearInterval(fetchInterval);
+        setTimeout(() => {
+          fetchInterval = setInterval(fetchTaixiuData, 5000);
+        }, 10000);
+      }
+    } else if (error.request) {
+      console.error('[❌] Không nhận được response từ server');
+    } else {
+      console.error('[❌] Lỗi fetch API:', error.message);
+    }
   }
 }
 
-setInterval(fetchData, 3000);
+function startDataFetching() {
+  console.log('[🚀] Bắt đầu fetch dữ liệu từ API...');
+  fetchTaixiuData();
+  fetchInterval = setInterval(fetchTaixiuData, 3000);
+}
 
-// === API routes ===
-app.get('/', (req, res) => {
-  res.send(`
-    <h2>🎯 SunWin Tài Xỉu - Pattern 10 T/X</h2>
-    <p><a href="/data">Xem dữ liệu hiện tại</a></p>
-    <p><a href="/patterns">Xem patternMap</a></p>
-    <p><a href="/history">Xem lịch sử 10 phiên gần nhất</a></p>
-  `);
-});
-
+// === API Routes ===
 app.get('/axobantol', (req, res) => {
-  res.json(currentData);
-});
-
-app.get('/patterns', (req, res) => {
-  res.json({
-    total_patterns: Object.keys(patternMap).length,
-    patterns: patternMap
-  });
+  try {
+    res.json({
+      phien_cu: currentData.phien_cu,
+      ket_qua: currentData.ket_qua,
+      xuc_xac: currentData.xuc_xac,
+      phien_moi: currentData.phien_moi,
+      pattern: currentData.pattern,
+      du_doan: currentData.du_doan,
+      khop_pattern: currentData.khop_pattern,
+      reason: currentData.reason,
+      id: currentData.id
+    });
+  } catch (err) {
+    console.error('[❌] Lỗi /axobantol:', err.message);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
 });
 
 app.get('/history', (req, res) => {
-  res.json(gameHistory.slice(-10));
+  try {
+    res.json({
+      total_games: gameHistory.length,
+      last_10_games: gameHistory.slice(-10),
+      current_pattern: currentData.pattern,
+      api_status: 'PredictionMap Only',
+      last_session: lastSessionId
+    });
+  } catch (err) {
+    console.error('[❌] Lỗi /history:', err.message);
+    res.status(500).json({ error: 'Lỗi server' });
+  }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Server đang chạy tại http://localhost:${PORT}`);
+app.get('/', (req, res) => {
+  res.send(`
+    <h2>🎯 SunWin Tài Xỉu AI - PredictionMap Only</h2>
+    <p><a href="/axobantol">Xem JSON kết quả</a></p>
+    <p><a href="/history">Xem lịch sử game</a></p>
+    <p>Tổng phiên đã ghi: ${gameHistory.length}</p>
+    <p>Thuật toán: PredictionMap (max 10 ký tự)</p>
+    <p>Nguồn dữ liệu: https://sunlo-2dfb.onrender.com/api/taixiu/sunwin</p>
+  `);
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`[🌐] Server đang chạy tại http://0.0.0.0:${PORT}`);
+  startDataFetching();
 });
