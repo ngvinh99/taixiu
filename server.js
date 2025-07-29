@@ -332,7 +332,7 @@ app.get('/', (req, res) => {
   `);
 });
 
-app.get('/data', (req, res) => {
+app.get('/axobantol', (req, res) => {
   res.json(currentData);
 });
 
