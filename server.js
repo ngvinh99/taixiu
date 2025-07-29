@@ -10,7 +10,7 @@ const MAX_PATTERN_LENGTH = 10;
 const MAX_HISTORY = 100;
 
 let patternMap = {
-    "TXT": "Xỉu", 
+  "TXT": "Xỉu", 
   "TTXX": "Tài", 
   "XXTXX": "Tài", 
   "TTX": "Xỉu", 
