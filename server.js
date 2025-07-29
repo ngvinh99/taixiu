@@ -287,17 +287,14 @@ function generatePrediction(history) {
         };
     }
 
-    // Tạo pattern từ lịch sử
     const patternHistory = history.map(h => h.result === 'Tài' ? 'T' : 'X');
     const patternStr = patternHistory.join("");
 
-    // Kiểm tra PredictionMap từ pattern dài nhất đến ngắn nhất
     for (let length = Math.min(patternStr.length, 7); length >= 3; length--) {
         const currentPattern = patternStr.slice(-length);
 
         if (predictionMap[currentPattern]) {
             const prediction = predictionMap[currentPattern];
-
             return {
                 prediction: prediction,
                 reason: `[PredictionMap] Khớp pattern "${currentPattern}" → Dự đoán: ${prediction}`,
@@ -306,7 +303,6 @@ function generatePrediction(history) {
         }
     }
 
-    // Nếu không tìm thấy pattern nào trong PredictionMap
     return {
         prediction: Math.random() < 0.5 ? 'Tài' : 'Xỉu',
         reason: "Không tìm thấy pattern trong PredictionMap - chọn ngẫu nhiên",
@@ -320,23 +316,19 @@ async function fetchTaixiuData() {
     const response = await axios.get('https://sunlo-2dfb.onrender.com/api/taixiu/sunwin', {
       timeout: 8000,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0',
         'Accept': 'application/json',
         'Connection': 'keep-alive'
-      },
-      retry: 3,
-      retryDelay: 1000
+      }
     });
 
     const data = response.data;
-
     if (!data || typeof data !== 'object') {
       console.log('[⚠️] API trả về dữ liệu không hợp lệ:', data);
       return;
     }
 
     const sessionId = data.Phien || data.phien_cu || data.session || null;
-
     if (!sessionId) {
       console.log('[⚠️] Không tìm thấy session ID trong response:', data);
       return;
@@ -383,7 +375,6 @@ async function fetchTaixiuData() {
         }
 
         const predictionResult = generatePrediction(gameHistory);
-
         const patternHistory = gameHistory.map(h => h.result === 'Tài' ? 'T' : 'X');
         const patternStr = patternHistory.join("");
 
@@ -411,11 +402,9 @@ async function fetchTaixiuData() {
 
   } catch (error) {
     if (error.response) {
-      // Server response với lỗi status code
       console.error(`[❌] API lỗi ${error.response.status}: ${error.response.statusText}`);
       if (error.response.status === 502) {
         console.log('[⏳] Server đang khởi động lại, thử lại sau 10 giây...');
-        // Tăng interval khi gặp lỗi 502
         if (fetchInterval) {
           clearInterval(fetchInterval);
           setTimeout(() => {
@@ -424,14 +413,10 @@ async function fetchTaixiuData() {
         }
       }
     } else if (error.request) {
-      // Request được gửi nhưng không có response
       console.error('[❌] Không nhận được response từ server');
     } else {
-      // Lỗi khác
       console.error('[❌] Lỗi fetch API:', error.message);
     }
-    
-    // Không dừng hoàn toàn, tiếp tục với dữ liệu hiện tại
     return;
   }
 }
