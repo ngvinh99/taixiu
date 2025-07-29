@@ -449,9 +449,9 @@ app.get('/axobantol', (req, res) => {
       phien_cu: currentData.phien_cu || null,
       ket_qua: currentData.ket_qua || null,
       xuc_xac: Array.isArray(currentData.xuc_xac) ? currentData.xuc_xac : [],
-      next_session: currentData.phien_moi || null,
+      next_session: currentData.next_session || null,
       pattern: currentData.pattern || "",
-      prediction: currentData.du_doan || "",
+      prediction: currentData.prediction || "",
       khop_pattern: currentData.khop_pattern || "",
       reason: currentData.reason || "",
       id: currentData.id || "@axobantool"
